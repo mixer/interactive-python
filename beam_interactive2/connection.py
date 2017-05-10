@@ -1,4 +1,3 @@
-import collections
 import asyncio
 import json
 import websockets
@@ -36,8 +35,7 @@ class Connection:
         self._awaiting_replies = {}
         self._call_counter = 0
 
-        self._read_waiter = None
-        self._recv_queue = collections.deque()
+        self._recv_queue = asyncio.Queue()
         self._recv_task = None
 
         if start:
@@ -103,19 +101,17 @@ class Connection:
     def _read(self):
 
         while True:
-            self._read_waiter = asyncio.Future(loop=self._loop)
             try:
-                data = yield from self._socket.recv()
+                raw_data = yield from self._socket.recv()
             except asyncio.CancelledError:
                 break
             except websockets.ConnectionClosed as e:
-                self._read_waiter.set_exception(e)
+                self._recv_queue.put_nowait(e)
                 break
 
-            data = json.loads(self._decode(data))
+            data = json.loads(self._decode(raw_data))
             if not self._handle_recv(data):
-                self._recv_queue.append(data)
-                self._read_waiter.set_result(None)
+                self._recv_queue.put_nowait(data)
 
     async def set_compression(self, scheme):
         """Updates the compression used on the websocket this should be
@@ -174,10 +170,12 @@ class Connection:
                 dispatch_call(call)
         """
 
-        if len(self._recv_queue) == 0:
-            await self._read_waiter()
+        item = await self._recv_queue.get()
+        if isinstance(item, Exception):
+            self._recv_queue.put_nowait(item)
+            raise item
 
-        return self._recv_queue.popleft()
+        return item
 
     async def close(self):
         """Closes the socket connection gracefully"""
