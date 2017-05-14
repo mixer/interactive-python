@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 metadata_prop_name = "meta"
 etag_prop_name = "etag"
 
@@ -11,7 +13,7 @@ class DiffSettable(object):
         self.__data = {}
         self.__changed = []
         self.__immutable = immutable
-        self._bypass_setter = False
+        self.__bypass_setter = False
         self.apply_update(data)
 
     def _get_data(self, key, raw_value):
@@ -30,6 +32,18 @@ class DiffSettable(object):
         to the raw objects. The dict may be mutated and returned.
         """
         return mapping
+
+    @contextmanager
+    def _ignore_setter(self):
+        """Returns a context that can be used to set item properties while
+        ignoring the setter magic we'd otherwise do. For example::
+
+            with self._ignore_setter():
+                self.foo = 'bar'
+        """
+        self.__bypass_setter = True
+        yield
+        self.__bypass_setter = False
 
     def has_changed(self):
         """Returns whether the resource has had changes made to it."""
@@ -53,7 +67,7 @@ class DiffSettable(object):
         return self._create_changes(changed)
 
     def __setattr__(self, key, value):
-        if (len(key) > 0 and key[0] == '_') or self._bypass_setter:
+        if (len(key) > 0 and key[0] == '_') or self.__bypass_setter:
             self.__dict__[key] = value
             return
 
@@ -93,9 +107,8 @@ class Resource(DiffSettable):
     """
 
     def __init__(self, **kwargs):
-        self._bypass_setter = True
-        self.meta = Metadata({})
-        self._bypass_setter = False
+        with self._ignore_setter():
+            self.meta = Metadata({})
 
         super(Resource, self).__init__(kwargs)
 
