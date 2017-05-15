@@ -171,7 +171,7 @@ class Connection:
         """
 
         item = await self._recv_queue.get()
-        if isinstance(item, Exception):
+        if isinstance(item, websockets.ConnectionClosed):
             self._recv_queue.put_nowait(item)
             raise item
 
