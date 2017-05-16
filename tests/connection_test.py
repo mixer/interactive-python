@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 import asyncio
+import websockets
 
 from beam_interactive2 import Connection, GzipEncoding
 from ._util import AsyncTestCase, async_test, resolve, fixture
@@ -86,3 +87,24 @@ class TestInteractiveConnection(AsyncTestCase):
             {'type': 'method', 'method': 'setCompression', 'params': {
                 'scheme': ['text']}, 'discard': False, 'id': 1})
 
+    @async_test
+    def test_queues_packets(self):
+        json_data = '{"id":0,"type":"method","method":"some_method"}'
+        self._queue.put_nowait(json_data)
+        has_packet = yield from self._connection.has_packet()
+        self.assertTrue(has_packet)
+        self.assertJsonEqual(self._connection.get_packet(), json_data)
+        self.assertIsNone(self._connection.get_packet())
+
+    @async_test
+    def test_handles_connection_closed(self):
+        def raise_closed():
+            raise websockets.ConnectionClosed()
+
+        self._mock_socket.recv = raise_closed
+        self._queue.put_nowait('{"type":"method"}')
+
+        has_packet = yield from self._connection.has_packet()
+        self.assertTrue(has_packet)  # reads what we pushed to get unblocked
+        has_packet = yield from self._connection.has_packet()
+        self.assertFalse(has_packet)  # gets a connection closed

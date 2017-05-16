@@ -1,6 +1,7 @@
 import asyncio
 import json
 import websockets
+import collections
 
 from .log import logger
 from .encoding import TextEncoding
@@ -18,14 +19,14 @@ class Connection:
     """
 
     def __init__(self, address=None, authorization=None,
-                 interactive_version_id=None, extra_headers={},
+                 project_version_id=None, extra_headers={},
                  loop=asyncio.get_event_loop(), socket=None,
                  protocol_version="2.0", start=True):
 
         if authorization is not None:
             extra_headers['Authorization'] = authorization
-        if interactive_version_id is not None:
-            extra_headers['X-Interactive-Version'] = interactive_version_id
+        if project_version_id is not None:
+            extra_headers['X-Interactive-Version'] = project_version_id
         extra_headers['X-Protocol-Version'] = protocol_version
 
         self._socket = socket or websockets.client.connect(
@@ -35,7 +36,8 @@ class Connection:
         self._awaiting_replies = {}
         self._call_counter = 0
 
-        self._recv_queue = asyncio.Queue()
+        self._recv_queue = collections.deque()
+        self._recv_await = None
         self._recv_task = None
 
         if start:
@@ -103,15 +105,20 @@ class Connection:
         while True:
             try:
                 raw_data = yield from self._socket.recv()
-            except asyncio.CancelledError:
-                break
-            except websockets.ConnectionClosed as e:
-                self._recv_queue.put_nowait(e)
+            except (asyncio.CancelledError, websockets.ConnectionClosed):
+                if self._recv_await is not None:
+                    self._recv_await = asyncio.Future(loop=self._loop)
+                self._recv_await.set_result(False)
                 break
 
             data = json.loads(self._decode(raw_data))
-            if not self._handle_recv(data):
-                self._recv_queue.put_nowait(data)
+            if self._handle_recv(data):
+                continue
+
+            self._recv_queue.append(data)
+            if self._recv_await is not None:
+                self._recv_await.set_result(True)
+                self._recv_await = None
 
     async def set_compression(self, scheme):
         """Updates the compression used on the websocket this should be
@@ -160,22 +167,32 @@ class Connection:
             del self._awaiting_replies[id]
             raise e
 
-    async def recv(self):
-        """Yields method calls that come down from the Interactive connection.
-        Throws a ``websockets.exceptions.ConnectionClosed`` if the socket
-        is closed. Calls can be easily retrieved like so:
+    def get_packet(self):
+        """Synchronously reads a packet from the connection. Returns None if
+        there are no more packets in the queue. Example::
 
-            while True:
-                call = await connection.recv()
-                dispatch_call(call)
+            while await connection.has_packet():
+                dispatch_call(connection.get_packet())
         """
+        if len(self._recv_queue) > 0:
+            return self._recv_queue.popleft()
 
-        item = await self._recv_queue.get()
-        if isinstance(item, websockets.ConnectionClosed):
-            self._recv_queue.put_nowait(item)
-            raise item
+        return None
 
-        return item
+    async def has_packet(self):
+        """Blocks until a packet is read. Returns true if a packet is then
+        available, or false if the connection is subsequently closed. Example::
+
+            while await connection.has_packet():
+                dispatch_call(connection.get_packet())
+        """
+        if len(self._recv_queue) > 0:
+            return
+
+        if self._recv_await is None:
+            self._recv_await = asyncio.Future(loop=self._loop)
+
+        return await self._recv_await
 
     async def close(self):
         """Closes the socket connection gracefully"""
