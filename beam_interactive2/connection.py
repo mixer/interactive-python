@@ -4,11 +4,53 @@ import websockets
 import collections
 
 from .log import logger
-from .encoding import TextEncoding
+from .encoding import Encoding, TextEncoding
+
+
+class Call:
+    def __init__(self, connection, payload):
+        """
+        A Call is an incoming message from the Interactive service.
+        :param connection: the connection 
+        :param payload: 
+        """
+        self._connection = connection
+        self._payload = payload
+
+    @property
+    def name(self):
+        """
+        :return: The name of the method being called.
+        :rtype: str
+        """
+        return self._payload['method']
+
+    @property
+    def data(self):
+        """
+        :return: The payload of the method being called.
+        :rtype: dict
+        """
+        return self._payload['params']
+
+    def reply_error(self, result):
+        """
+        Submits a successful reply for the call.
+        :param result: The result to send to tetrisd
+        """
+        self._connection.reply(self._id, result=result)
+
+    def reply_error(self, error):
+        """
+        Submits an errorful reply for the call.
+        :param error: The error to send to tetrisd
+        """
+        self._connection.reply(self._id, error=error)
 
 
 class Connection:
-    """The Connection is used to connect to the Interactive server. It connects
+    """
+    The Connection is used to connect to the Interactive server. It connects
     to a provided socket address and provides an interface for making RPC
     calls. Example usage::
 
@@ -52,7 +94,8 @@ class Connection:
             self.set_compression(TextEncoding()), loop=self._loop)
 
     def _decode(self, data):
-        """Converts the packet data to a string,
+        """
+        Converts the packet data to a string,
         decompressing it if necessary. Always returns a string.
         """
         if isinstance(data, str):
@@ -66,7 +109,8 @@ class Connection:
                         "plain text", extra=e)
 
     def _encode(self, data):
-        """Converts the packet data to a string or byte array,
+        """
+        Converts the packet data to a string or byte array,
         compressing it if necessary.
         """
         try:
@@ -79,7 +123,8 @@ class Connection:
         return data
 
     def _handle_recv(self, data):
-        """Handles a received packets using internal hooks. Returns true
+        """
+        Handles a received packets using internal hooks. Returns true
         if the packet was handled and does not need to be bubbled to the
         caller, false otherwise.
         """
@@ -94,14 +139,19 @@ class Connection:
 
         return False
 
+    def _send(self, payload):
+        self._socket.send(self._encode(json.dumps(payload)))
+
     def start(self):
-        """ Starts the socket 'read' loop. Mostly for testing, this is done
-        automatically for you otherwise."""
+        """
+        Starts the socket 'read' loop. Mostly for testing, this is done
+        automatically for you otherwise.
+        :rtype: None
+        """
         self._recv_task = asyncio.ensure_future(self._read(), loop=self._loop)
 
     @asyncio.coroutine
     def _read(self):
-
         while True:
             try:
                 raw_data = yield from self._socket.recv()
@@ -115,7 +165,7 @@ class Connection:
             if self._handle_recv(data):
                 continue
 
-            self._recv_queue.append(data)
+            self._recv_queue.append(Call(self, data))
             if self._recv_await is not None:
                 self._recv_await.set_result(True)
                 self._recv_await = None
@@ -129,6 +179,11 @@ class Connection:
         You can, optionally, await on the resolution of method, though
         doing so it not at all required. Returns True if the server agreed
         on and executed the switch.
+        
+        :param scheme: The compression scheme to use
+        :type scheme: Encoding
+        :return: Whether the upgrade was successful
+        :rtype: bool
         """
         result = await self.call("setCompression", {'scheme': [scheme.name()]})
         if result['scheme'] == scheme.name():
@@ -137,42 +192,76 @@ class Connection:
 
         return False
 
+    def reply(self, call_id, result=None, error=None):
+        """
+        Sends a reply for a packet id. Either the result or error should
+        be fulfilled.
+        
+        :param call_id: The ID of the call being replied to.
+        :type call_id: int
+        :param result: The successful result of the call.
+        :param error: The errorful result of the call.
+        """
+        packet = {'type': 'reply', 'id': call_id}
+        if result is not None:
+            packet['result'] = result
+        if error is not None:
+            packet['error'] = result
+
+        self._send(packet)
+
     async def call(self, method, params, discard=False, timeout=10):
-        """Sends a method call to the interactive socket. If discard
+        """
+        Sends a method call to the interactive socket. If discard
         is false, we'll wait for a response before returning, up to the
         timeout duration in seconds, at which point it raises an
         asyncio.TimeoutError. If the timeout is None, we'll wait forever.
+        
+        :param method: Method name to call
+        :type method: str
+        :param params: Parameters to insert into the method, generally a dict.
+        :param discard: ``True`` to not request any reply to the method.
+        :type discard: bool
+        :param timeout: Call timeout duration, in seconds.
+        :type timeout: int
+        :return: The call response, or None if it was discarded.
+        :raises: asyncio.TimeoutError
         """
-        id = self._call_counter
-        encoded = self._encode(json.dumps({
+
+        packet = {
             'type': 'method',
             'method': method,
             'params': params,
-            'discard': discard,
-            'id': id
-        }))
+            'id': self._call_counter,
+        }
+
+        if discard:
+            packet['discard'] = True
 
         self._call_counter += 1
-        self._socket.send(encoded)
+        self._send(packet)
 
         if discard:
             return None
 
         future = asyncio.Future(loop=self._loop)
-        self._awaiting_replies[id] = future
+        self._awaiting_replies[packet['id']] = future
 
         try:
             return await asyncio.wait_for(future, timeout, loop=self._loop)
         except Exception as e:
-            del self._awaiting_replies[id]
+            del self._awaiting_replies[packet['id']]
             raise e
 
     def get_packet(self):
-        """Synchronously reads a packet from the connection. Returns None if
+        """
+        Synchronously reads a packet from the connection. Returns None if
         there are no more packets in the queue. Example::
 
             while await connection.has_packet():
-                dispatch_call(connection.get_packet())
+                dispatch_call(connection.get_packet()) 
+        
+        :rtype: Call
         """
         if len(self._recv_queue) > 0:
             return self._recv_queue.popleft()
@@ -180,11 +269,14 @@ class Connection:
         return None
 
     async def has_packet(self):
-        """Blocks until a packet is read. Returns true if a packet is then
+        """
+        Blocks until a packet is read. Returns true if a packet is then
         available, or false if the connection is subsequently closed. Example::
 
             while await connection.has_packet():
                 dispatch_call(connection.get_packet())
+        
+        :rtype: bool
         """
         if len(self._recv_queue) > 0:
             return

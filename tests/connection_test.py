@@ -41,8 +41,7 @@ class TestInteractiveConnection(AsyncTestCase):
         self.assertEqual(4, results[0])
         self.assertJsonEqual(
             self._mock_socket.send.call_args[0][0],
-            {'type': 'method', 'method': 'square', 'params': 2,
-             'discard': False, 'id': 0})
+            {'type': 'method', 'method': 'square', 'params': 2, 'id': 0})
 
     @async_test
     def test_times_out_calls(self):
@@ -85,15 +84,16 @@ class TestInteractiveConnection(AsyncTestCase):
         self.assertJsonEqual(
             self._mock_socket.send.call_args[0][0],
             {'type': 'method', 'method': 'setCompression', 'params': {
-                'scheme': ['text']}, 'discard': False, 'id': 1})
+                'scheme': ['text']}, 'id': 1})
 
     @async_test
     def test_queues_packets(self):
-        json_data = '{"id":0,"type":"method","method":"some_method"}'
+        json_data = '{"id":0,"type":"method","method":"some_method",' \
+                    '"params":{"foo": 42}}'
         self._queue.put_nowait(json_data)
         has_packet = yield from self._connection.has_packet()
         self.assertTrue(has_packet)
-        self.assertJsonEqual(self._connection.get_packet(), json_data)
+        self.assertJsonEqual(self._connection.get_packet().data, '{"foo":42}')
         self.assertIsNone(self._connection.get_packet())
 
     @async_test
