@@ -6,7 +6,7 @@ def get_fixture():
     resource = Resource(
         id='red_team',
         id_property='groupID',
-        mutable_props=['disabled', 'color']
+        data_props=['disabled', 'color']
     )
 
     resource.assign(
@@ -16,7 +16,7 @@ def get_fixture():
         meta={'spooky': True},
     )
 
-    resource._etag = '1234'
+    resource._data['etag'] = '1234'
     resource._mark_synced()
     resource.meta._data['spooky']['etag'] = '5678'
 

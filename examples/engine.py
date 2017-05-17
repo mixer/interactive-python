@@ -103,7 +103,12 @@ class BaseGame:
     def update(self, pressed_key=None):
         raise NotImplementedError()
 
+    async def setup(self):
+        pass
+
     async def loop(self):
+        await self.setup()
+
         while True:
             self._screen.timeout(1)
             pressed_key = self._screen.getch()

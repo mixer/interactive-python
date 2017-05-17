@@ -61,18 +61,22 @@ class Connection:
     """
 
     def __init__(self, address=None, authorization=None,
-                 project_version_id=None, extra_headers={},
-                 loop=asyncio.get_event_loop(), socket=None,
-                 protocol_version="2.0", start=True):
+                 project_version_id=None, project_sharecode=None,
+                 extra_headers={}, loop=asyncio.get_event_loop(), socket=None,
+                 protocol_version="2.0"):
 
         if authorization is not None:
             extra_headers['Authorization'] = authorization
         if project_version_id is not None:
             extra_headers['X-Interactive-Version'] = project_version_id
+        if project_sharecode is not None:
+            extra_headers['X-Interactive-Sharecode'] = project_sharecode
         extra_headers['X-Protocol-Version'] = protocol_version
 
-        self._socket = socket or websockets.client.connect(
+        self._socket_or_connector = socket or websockets.client.connect(
             address, loop=loop, extra_headers=extra_headers)
+        self._socket = None
+
         self._loop = loop
         self._encoding = TextEncoding()
         self._awaiting_replies = {}
@@ -82,8 +86,27 @@ class Connection:
         self._recv_await = None
         self._recv_task = None
 
-        if start:
-            self.start()
+    async def connect(self):
+        """
+        Connects to the Interactive server, waiting until the connection
+        if fully established before returning. Can throw a ClosedError
+        if something, such as authentication, fails.
+        """
+
+        if not hasattr(self._socket_or_connector, '__await__'):
+            self._socket = self._socket_or_connector
+        else:
+            self._socket = await self._socket_or_connector
+
+        # await a hello event
+        while True:
+            packet = await self._read_single()
+            if packet['type'] == 'method' and packet['method'] == 'hello':
+                break
+
+            self._recv_queue.append(packet)
+
+        self._recv_task = asyncio.ensure_future(self._read(), loop=self._loop)
 
     def _fallback_to_plain_text(self):
         if isinstance(self._encoding, TextEncoding):
@@ -124,9 +147,7 @@ class Connection:
 
     def _handle_recv(self, data):
         """
-        Handles a received packets using internal hooks. Returns true
-        if the packet was handled and does not need to be bubbled to the
-        caller, false otherwise.
+        Handles a single received packet from the Interactive service.
         """
 
         if data['type'] == 'reply':
@@ -135,40 +156,51 @@ class Connection:
                     set_result(data['result'])
                 del self._awaiting_replies[data['id']]
 
-            return True
+            return
 
-        return False
+        self._recv_queue.append(Call(self, data))
+        if self._recv_await is not None:
+            self._recv_await.set_result(True)
+            self._recv_await = None
 
     def _send(self, payload):
+        """
+        Encodes and sends a dict payload.
+        """
         self._socket.send(self._encode(json.dumps(payload)))
 
-    def start(self):
+    async def _read_single(self):
         """
-        Starts the socket 'read' loop. Mostly for testing, this is done
-        automatically for you otherwise.
-        :rtype: None
+        Reads a single event off the websocket.
         """
-        self._recv_task = asyncio.ensure_future(self._read(), loop=self._loop)
+        try:
+            raw_data = await self._socket.recv()
+        except (asyncio.CancelledError, websockets.ConnectionClosed) as e:
+            if self._recv_await is None:
+                self._recv_await = asyncio.Future(loop=self._loop)
+            self._recv_await.set_result(False)
+            raise e
 
-    @asyncio.coroutine
-    def _read(self):
+        return json.loads(self._decode(raw_data))
+
+    async def _read(self):
+        """
+        Endless read loop that runs until the socket is closed.
+        """
         while True:
             try:
-                raw_data = yield from self._socket.recv()
+                data = await self._read_single()
             except (asyncio.CancelledError, websockets.ConnectionClosed):
-                if self._recv_await is not None:
-                    self._recv_await = asyncio.Future(loop=self._loop)
-                self._recv_await.set_result(False)
+                break  # will already be handled
+            except Exception as e:
+                logger.error("error in interactive read loop", extra=e)
                 break
 
-            data = json.loads(self._decode(raw_data))
-            if self._handle_recv(data):
-                continue
-
-            self._recv_queue.append(Call(self, data))
-            if self._recv_await is not None:
-                self._recv_await.set_result(True)
-                self._recv_await = None
+            if isinstance(data, list):
+                for item in data:
+                    self._handle_recv(item)
+            else:
+                self._handle_recv(data)
 
     async def set_compression(self, scheme):
         """Updates the compression used on the websocket this should be

@@ -23,6 +23,7 @@ setup(
     url='https://github.com/WatchBeam/beam-interactive-python2',
     license='MIT',
     packages=find_packages(exclude=['tests']),
-    install_requires=['websockets>=3.3', 'varint>=1.0.2', 'pyee>=3.0.3'],
+    install_requires=['websockets>=3.3', 'varint>=1.0.2', 'pyee>=3.0.3',
+                      'aiohttp>=2.0.7'],
     include_package_data=True,
 )
