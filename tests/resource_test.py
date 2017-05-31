@@ -3,16 +3,33 @@ from beam_interactive2._util import Resource
 
 
 def get_fixture():
-    return Resource(groupID='red_team', etag='1234',
-                    meta={'enabled': {'etag': '5678', 'value': True}})
+    resource = Resource(
+        id='red_team',
+        id_property='groupID',
+        data_props=['disabled', 'color']
+    )
+
+    resource.assign(
+        groupID='red_team',
+        color='red',
+        disabled=False,
+        meta={'spooky': True},
+    )
+
+    resource._data['etag'] = '1234'
+    resource._mark_synced()
+    resource.meta._data['spooky']['etag'] = '5678'
+
+    return resource
 
 
 class TestGzipEncoding(unittest.TestCase):
 
     def test_accesses_data(self):
         resource = get_fixture()
-        self.assertEqual("red_team", resource.groupID)
-        self.assertEqual(True, resource.meta.enabled)
+        self.assertEqual('red_team', resource.id)
+        self.assertEqual('red', resource.color)
+        self.assertEqual(True, resource.meta.spooky)
         with self.assertRaises(AttributeError):
             resource.meta.wut
         with self.assertRaises(AttributeError):
@@ -20,32 +37,26 @@ class TestGzipEncoding(unittest.TestCase):
 
     def tests_diffs_resource(self):
         resource = get_fixture()
-        resource.disabled = True  # adding a new property
-        resource.groupID = 'blue_team'  # modifying an existing property
+        resource.disabled = True  # changing a property
+        resource.groupID = 'red_team'  # setting without notification
         self.assertTrue(resource.has_changed())
         self.assertEqual(
-            {'etag':'1234', 'groupID': 'blue_team', 'disabled': True},
-            resource.capture_changes()
+            {'etag': '1234', 'groupID': 'red_team', 'disabled': True},
+            resource._capture_changes()
         )
         self.assertFalse(resource.has_changed())
 
-        resource.groupID = 'blue_team'  # setting but not changing the prop
-        self.assertFalse(resource.has_changed())
-        self.assertEqual({'etag': '1234'}, resource.capture_changes())
-
-    def test_fails_to_set_immutable_properties(self):
-        with self.assertRaises(AttributeError):
-            get_fixture().etag = 'wut'
-
     def test_includes_changes_to_metadata(self):
         resource = get_fixture()
-        resource.meta.enabled = False
+        resource.meta.spooky = False
+
         self.assertTrue(resource.has_changed())
         self.assertEqual(
             {
                 'etag': '1234',
-                'meta': {'enabled': {'etag': '5678', 'value': False}}
+                'groupID': 'red_team',
+                'meta': {'spooky': {'etag': '5678', 'value': False}}
              },
-            resource.capture_changes()
+            resource._capture_changes()
         )
         self.assertFalse(resource.has_changed())
