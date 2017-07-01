@@ -4,7 +4,7 @@ control the paddle on the right. We handle all the control setup within our
 client, but you can also design your controls in the Interactive Studio!
 
 You should provide an OAuth token to connect to interactive on the comment line.
-You can get this token by going to https://interactive.beam.pro/request
+You can get this token by going to https://interactive.mixer.com/request
 
 Press 'q' to quit.
 
