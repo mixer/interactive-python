@@ -82,6 +82,7 @@ class Connection:
         self._encoding = TextEncoding()
         self._awaiting_replies = {}
         self._call_counter = 0
+        self._last_sequence_number = 0
 
         self._recv_queue = collections.deque()
         self._recv_await = None
@@ -150,6 +151,9 @@ class Connection:
         """
         Handles a single received packet from the Interactive service.
         """
+
+        if 'seq' in data:
+            self._last_sequence_number = data['seq']
 
         if data['type'] == 'reply':
             if data['id'] in self._awaiting_replies:
@@ -236,6 +240,7 @@ class Connection:
         :param error: The errorful result of the call.
         """
         packet = {'type': 'reply', 'id': call_id}
+
         if result is not None:
             packet['result'] = result
         if error is not None:
@@ -266,6 +271,7 @@ class Connection:
             'method': method,
             'params': params,
             'id': self._call_counter,
+            'seq': self._last_sequence_number,
         }
 
         if discard:
