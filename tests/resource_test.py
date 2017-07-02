@@ -5,8 +5,7 @@ from beam_interactive2._util import Resource
 def get_fixture():
     resource = Resource(
         id='red_team',
-        id_property='groupID',
-        data_props=['disabled', 'color']
+        id_property='groupID'
     )
 
     resource.assign(
@@ -16,14 +15,12 @@ def get_fixture():
         meta={'spooky': True},
     )
 
-    resource._data['etag'] = '1234'
     resource._mark_synced()
-    resource.meta._data['spooky']['etag'] = '5678'
 
     return resource
 
 
-class TestGzipEncoding(unittest.TestCase):
+class TestResources(unittest.TestCase):
 
     def test_accesses_data(self):
         resource = get_fixture()
@@ -35,13 +32,13 @@ class TestGzipEncoding(unittest.TestCase):
         with self.assertRaises(AttributeError):
             resource.wut
 
-    def tests_diffs_resource(self):
+    def test_diffs_resource(self):
         resource = get_fixture()
         resource.disabled = True  # changing a property
         resource.groupID = 'red_team'  # setting without notification
         self.assertTrue(resource.has_changed())
         self.assertEqual(
-            {'etag': '1234', 'groupID': 'red_team', 'disabled': True},
+            {'groupID': 'red_team', 'disabled': True},
             resource._capture_changes()
         )
         self.assertFalse(resource.has_changed())
@@ -53,9 +50,8 @@ class TestGzipEncoding(unittest.TestCase):
         self.assertTrue(resource.has_changed())
         self.assertEqual(
             {
-                'etag': '1234',
                 'groupID': 'red_team',
-                'meta': {'spooky': {'etag': '5678', 'value': False}}
+                'meta': {'spooky': False}
              },
             resource._capture_changes()
         )

@@ -1,16 +1,11 @@
 import string
 import random
-import copy
+import json
 import asyncio
 
 from pyee import EventEmitter
 
 metadata_prop_name = "meta"
-etag_prop_name = "etag"
-
-
-def random_etag():
-    return random_string(7)
 
 
 def random_string(length, source=string.ascii_letters):
@@ -23,40 +18,33 @@ def until_event(emitter, name, loop=asyncio.get_event_loop()):
     return fut
 
 
-class Metadata:
+class OverridableJSONEncoder(json.JSONEncoder):
     """
-    Metadata is used to accessing and modifying a resource's metadata props.
+    OverridableJSONEncoder extends the default JSON encoder to look for a method
+    'to_json' on objects to be serialized, calling that when possible.
     """
 
-    def __init__(self, data={}):
+    def default(self, obj):
+        if callable(getattr(obj, 'to_json', None)):
+            return obj.to_json()
+        return super().default(obj)
+
+json_encoder = OverridableJSONEncoder(check_circular=False, allow_nan=False,
+                                      separators=(',', ':'))
+
+
+class ChangeTracker:
+    """
+    ChangeTracker is a simple structure that keeps track of changes made to
+    properties of the object.
+    """
+
+    def __init__(self, data={}, intrinsic_properties=[]):
+        self._intrinsic_properties = intrinsic_properties
+        self._nested_trackers = [(key, value) for key, value in data.items()
+                                 if isinstance(value, ChangeTracker)]
         self._data = data
-        self._changes = []
-
-    def _capture_changes(self):
-        """
-        Returns a dict of changes and resets the "changed" state.
-        :rtype: dict
-        """
-        output = {}
-        for key in self._changes:
-            output[key] = self._data[key]
-        self._changes = []
-        return output
-
-    def _apply_changes(self, change):
-        """
-        Applies a complete update of properties from the remote server.
-        """
-        for key, value in change.items():
-            if key not in self._changes:
-                self._data[key] = value
-
-    def _resolve_all(self):
-        """
-        Serializes and marks as synced all properties on the resource.
-        """
-        self._mark_synced()
-        return copy.deepcopy(self.meta._data)
+        self._changes = set()
 
     def assign(self, **kwargs):
         """
@@ -64,63 +52,98 @@ class Metadata:
         :rtype: Resource
         """
         for key, value in kwargs.items():
-            setattr(self, key, value)
+            self._set_and_track_property(key, value)
 
         return self
+
+    def to_json(self):
+        """
+        to_json will be called when serializing the resource to JSON. It returns
+        the raw data.
+        :return:
+        """
+        return self._data
+
+    def _capture_changes(self):
+        """
+        Returns a dict of changes and resets the "changed" state.
+        :rtype: dict
+        """
+        output = {}
+        for prop in self._intrinsic_properties:
+            output[prop] = self._data[prop]
+
+        for key, tracker in self._nested_trackers:
+            if tracker.has_changed():
+                output[key] = tracker._capture_changes()
+
+        for key in self._changes:
+            output[key] = self._data.get(key, None)
+
+        self._changes.clear()
+        return output
 
     def has_changed(self):
         """
         Returns whether any metadata properties have changed.
         :rtype: bool
         """
-        return len(self._changes) > 0
+        if len(self._changes) > 0:
+            return True
+
+        if any(tracker.has_changed() for key, tracker in self._nested_trackers):
+            return True
+
+        return False
 
     def _mark_synced(self):
         """
         Marks the changed properties on the resource as having been saved.
         """
-        self._changes = []
+        self._changes.clear()
+
+    def _set_and_track_property(self, key, value):
+        previous_value = self._data.get(key, None)
+
+        if isinstance(previous_value, ChangeTracker):
+            previous_value.assign(**value)
+        elif value != previous_value:
+            if value is None:
+                del self._data[key]
+            else:
+                self._data[key] = value
+
+            self._changes.add(key)
 
     def __setattr__(self, key, value):
         if key[0] == '_':
             self.__dict__[key] = value
             return
 
+        self._set_and_track_property(key, value)
+
+    def __getattr__(self, key):
         if key not in self._data:
-            self._data[key] = {etag_prop_name: random_etag(), 'value': None}
+            raise AttributeError(key)
 
-        if value == self._data[key]['value']:
-            return
-
-        self._data[key]['value'] = value
-        if key not in self._changes:
-            self._changes.append(key)
-
-    def __getattr__(self, item):
-        if item not in self._data:
-            raise AttributeError(item)
-
-        return self._data[item]['value']
+        return self._data[key]
 
 
-class Resource(EventEmitter):
+class Resource(EventEmitter, ChangeTracker):
     """Resource represents some taggable, metadata-attachable construct in
     Interactive. Scenes, groups, and participants are resources.
     """
 
-    def __init__(self, id, id_property, data_props=[],
-                 etag=random_etag()):
-        self._data_props = data_props + [etag_prop_name, id_property]
-        self._changes = []
-        self._data = {id_property: id, etag_prop_name: etag}
+    def __init__(self, id, id_property):
+        ChangeTracker.__init__(
+            self,
+            intrinsic_properties=[id_property],
+            data={id_property: id, 'meta': ChangeTracker()}
+        )
+        EventEmitter.__init__(self)
+
         self._id_property = id_property
         self._connection = None
-
-        for key in data_props:
-            if key not in self._data:
-                self._data[key] = None
-
-        self.meta = Metadata()
 
     @property
     def id(self):
@@ -136,38 +159,14 @@ class Resource(EventEmitter):
         """
         self._connection = connection
 
-    def has_changed(self):
-        """
-        Returns whether any metadata properties have changed.
-        :rtype: bool
-        """
-        return self.meta.has_changed() or len(self._changes) > 0
-
-    def assign(self, **kwargs):
-        """
-        Assigns data in-bulk to the resource, returns the resource.
-        :rtype: Resource
-        """
-        for key, value in kwargs.items():
-            if key == 'meta':
-                self.meta.assign(**value)
-            else:
-                setattr(self, key, value)
-
-        return self
-
     def _apply_changes(self, change, call):
         """
         Applies a complete update of properties from the remote server.
         :type change: dict
         :type call: Call
         """
-        for key, value in change.items():
-            if key == metadata_prop_name:
-                self.meta._apply_changes(**value)
-            elif key not in self._changes and key in self._data_props:
-                self._data[key] = value
-
+        super().assign(change)
+        self._mark_synced()
         self.emit('update', call)
 
     def _on_deleted(self, call):
@@ -176,55 +175,3 @@ class Resource(EventEmitter):
         :type call: Call
         """
         self.emit('delete', call)
-
-    def _capture_changes(self):
-        """
-        Returns a dict of changes and resets the "changed" state.
-        :rtype: dict
-        """
-        changes = {
-            self._id_property: self.id,
-            etag_prop_name: self._data[etag_prop_name],
-        }
-
-        for key in self._changes:
-            changes[key] = self._data[key]
-
-        self._changes = []
-
-        if self.meta.has_changed():
-            changes[metadata_prop_name] = self.meta._capture_changes()
-
-        return changes
-
-    def _mark_synced(self):
-        """
-        Marks the changed properties on the resource as having been saved.
-        """
-        self._changes = []
-        self.meta._mark_synced()
-
-    def _resolve_all(self):
-        """
-        Serializes and marks as synced all properties on the resource.
-        """
-        props = copy.deepcopy(self._data)
-        props[metadata_prop_name] = self.meta._resolve_all()
-        self._mark_synced()
-        return props
-
-    def __setattr__(self, key, value):
-        if key[0] == '_' or key not in self._data_props:
-            self.__dict__[key] = value
-            return
-
-        if value != self._data[key]:
-            self._data[key] = value
-            if key not in self._changes:
-                self._changes.append(key)
-
-    def __getattr__(self, item):
-        if item not in self._data:
-            raise AttributeError(item)
-
-        return self._data[item]

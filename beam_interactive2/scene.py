@@ -1,16 +1,16 @@
 from pyee import EventEmitter
 
-from ._util import random_etag, Resource
+from ._util import Resource
 
 
 class Scene(Resource):
     """
     Scene is a container for controls in interactive. Groups can be assigned
     to scenes. It emits:
-    
+
      - A ``delete`` event when the scene is deleted, with the Call from
        "onSceneDelete".
-    
+
      - An ``update`` event when the scene is updated, with the Call from
        "onSceneUpdate".
     """
@@ -19,8 +19,8 @@ class Scene(Resource):
         super(Scene, self).__init__(scene_id, id_property='sceneID')
         self._controls = {}
         self._control_kinds = {
-            'button': ButtonControl,
-            'joystick': JoystickControl,
+            'button': Button,
+            'joystick': Joystick,
         }
 
         if len(kwargs) > 0:
@@ -39,7 +39,7 @@ class Scene(Resource):
         to reassign any groups who are on that scene to.
         :param reassign_scene_id:
         :type reassign_scene_id: str
-        :rtype: None 
+        :rtype: None
         """
         await self._connection.call('deleteScene', {
             'sceneID': self.id,
@@ -100,21 +100,18 @@ class Control(Resource):
     """
     Control is a structure on which participants in interactive provide input.
     It emits:
-    
+
      - A ``delete`` event when the control is deleted, with the Call from
        "onControlDelete".
-    
+
      - An ``update`` event when the control is updated, with the Call from
        "onControlUpdate".
     """
 
-    def __init__(self, control_id, data_props=[], **kwargs):
-        super(Control, self).__init__(control_id, id_property='controlID',
-                                      data_props=data_props)
+    def __init__(self, control_id, **kwargs):
+        super(Control, self).__init__(control_id, id_property='controlID')
         self._scene = None
-
-        if len(kwargs) > 0:
-            self.assign(kwargs)
+        self.assign(**kwargs)
 
     def _attach_scene(self, scene):
         self._scene = scene
@@ -141,22 +138,13 @@ class Control(Resource):
 
 class Button(Control):
     def __init__(self, control_id, **kwargs):
-        super(Button, self).__init__(
-            control_id,
-            data_props=['kind', 'keycode', 'text', 'cost', 'progress',
-                        'cooldown', 'position', 'disabled'],
-        )
-
+        super(self).__init__(control_id)
         kwargs['kind'] = 'button'
         self.assign(**kwargs)
 
 
 class Joystick(Control):
     def __init__(self, control_id, **kwargs):
-        super(Button, self).__init__(
-            control_id,
-            data_props=['kind', 'sampleRate', 'angle', 'intensity', 'disabled'],
-        )
-
+        super().__init__(control_id)
         kwargs['kind'] = 'joystick'
         self.assign(**kwargs)

@@ -5,14 +5,15 @@ import collections
 
 from .log import logger
 from .encoding import Encoding, TextEncoding
+from ._util import json_encoder
 
 
 class Call:
     def __init__(self, connection, payload):
         """
         A Call is an incoming message from the Interactive service.
-        :param connection: the connection 
-        :param payload: 
+        :param connection: the connection
+        :param payload:
         """
         self._connection = connection
         self._payload = payload
@@ -167,7 +168,7 @@ class Connection:
         """
         Encodes and sends a dict payload.
         """
-        self._socket.send(self._encode(json.dumps(payload)))
+        self._socket.send(self._encode(json_encoder.encode(payload)))
 
     async def _read_single(self):
         """
@@ -211,7 +212,7 @@ class Connection:
         You can, optionally, await on the resolution of method, though
         doing so it not at all required. Returns True if the server agreed
         on and executed the switch.
-        
+
         :param scheme: The compression scheme to use
         :type scheme: Encoding
         :return: Whether the upgrade was successful
@@ -228,7 +229,7 @@ class Connection:
         """
         Sends a reply for a packet id. Either the result or error should
         be fulfilled.
-        
+
         :param call_id: The ID of the call being replied to.
         :type call_id: int
         :param result: The successful result of the call.
@@ -248,7 +249,7 @@ class Connection:
         is false, we'll wait for a response before returning, up to the
         timeout duration in seconds, at which point it raises an
         asyncio.TimeoutError. If the timeout is None, we'll wait forever.
-        
+
         :param method: Method name to call
         :type method: str
         :param params: Parameters to insert into the method, generally a dict.
@@ -291,8 +292,8 @@ class Connection:
         there are no more packets in the queue. Example::
 
             while await connection.has_packet():
-                dispatch_call(connection.get_packet()) 
-        
+                dispatch_call(connection.get_packet())
+
         :rtype: Call
         """
         if len(self._recv_queue) > 0:
@@ -307,7 +308,7 @@ class Connection:
 
             while await connection.has_packet():
                 dispatch_call(connection.get_packet())
-        
+
         :rtype: bool
         """
         if len(self._recv_queue) > 0:
