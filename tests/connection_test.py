@@ -20,7 +20,7 @@ class TestInteractiveConnection(AsyncTestCase):
         self._queue = asyncio.Queue(loop=self._loop)
         self._connection = Connection(socket=self._mock_socket, loop=self._loop)
         self._mock_socket.recv = self._queue.get
-        self._queue.put_nowait('{"type":"method","method":"hello"}')
+        self._queue.put_nowait('{"type":"method","method":"hello","seq":1}')
 
     def tearDown(self):
         if self._connection._recv_task is not None:
@@ -31,7 +31,7 @@ class TestInteractiveConnection(AsyncTestCase):
         result = await asyncio.gather(
             self._connection.set_compression(GzipEncoding()),
             self._queue.put(
-                '{"id":0,"type":"reply","result":{"scheme":"gzip"}}'),
+                '{"id":0,"type":"reply","result":{"scheme":"gzip"},"seq":2}'),
             loop=self._loop)
 
         self.assertTrue(result[0])
@@ -42,13 +42,15 @@ class TestInteractiveConnection(AsyncTestCase):
         yield from self._connection.connect()
         results = yield from asyncio.gather(
             self._connection.call('square', 2),
-            self._queue.put('{"id":0,"type":"reply","result":4}'),
+            self._queue.put('{"id":0,"type":"reply","result":4,"seq":2}'),
             loop=self._loop)
 
         self.assertEqual(4, results[0])
         self.assertJsonEqual(
             self._mock_socket.send.call_args[0][0],
-            {'type': 'method', 'method': 'square', 'params': 2, 'id': 0})
+            {'type': 'method', 'method': 'square',
+             'params': 2, 'id': 0, 'seq': 0}
+        )
 
     @async_test
     def test_times_out_calls(self):
@@ -74,7 +76,7 @@ class TestInteractiveConnection(AsyncTestCase):
         result = yield from asyncio.gather(
             self._connection.set_compression(GzipEncoding()),
             self._queue.put(
-                '{"id":0,"type":"reply","result":{"scheme":"text"}}'),
+                '{"id":0,"type":"reply","result":{"scheme":"text"},"seq":2}'),
             loop=self._loop)
 
         self.assertFalse(result[0])
@@ -88,14 +90,14 @@ class TestInteractiveConnection(AsyncTestCase):
         yield from self._queue.put(fixture('gzipped_square_reply', 'rb')[::-1])
         yield from asyncio.sleep(0, loop=self._loop)
         yield from self._queue.put('{"id":0,"type":"reply",'
-                                   '"result":{"scheme":"text"}}')
+                                   '"result":{"scheme":"text"},"seq":2}')
         yield from asyncio.sleep(0, loop=self._loop)
 
         self.assertEqual('text', self._connection._encoding.name())
         self.assertJsonEqual(
             self._mock_socket.send.call_args[0][0],
             {'type': 'method', 'method': 'setCompression', 'params': {
-                'scheme': ['text']}, 'id': 1})
+                'scheme': ['text']}, 'id': 1, 'seq': 2})
 
     @async_test
     def test_queues_packets(self):
