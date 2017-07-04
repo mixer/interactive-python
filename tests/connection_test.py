@@ -17,6 +17,9 @@ class TestInteractiveConnection(AsyncTestCase):
         self._mock_socket = Mock()
         self._mock_socket.close = asyncio.Future(loop=self._loop)
         self._mock_socket.close.set_result(None)
+        send_future = asyncio.Future(loop=self._loop)
+        send_future.set_result(None)
+        self._mock_socket.send.return_value = send_future
         self._queue = asyncio.Queue(loop=self._loop)
         self._connection = Connection(socket=self._mock_socket, loop=self._loop)
         self._mock_socket.recv = self._queue.get

@@ -1,5 +1,3 @@
-from pyee import EventEmitter
-
 from ._util import Resource
 
 
@@ -17,14 +15,12 @@ class Scene(Resource):
 
     def __init__(self, scene_id, **kwargs):
         super(Scene, self).__init__(scene_id, id_property='sceneID')
+        self.assign(**kwargs)
         self._controls = {}
         self._control_kinds = {
             'button': Button,
             'joystick': Joystick,
         }
-
-        if len(kwargs) > 0:
-            self.assign(kwargs)
 
     @property
     def controls(self):
@@ -46,13 +42,13 @@ class Scene(Resource):
             'reassignSceneID': reassign_scene_id,
         })
 
-    async def update(self):
+    async def update(self, priority=0):
         """
         Saves all changes updates made to the scene.
         """
         return await self._connection.call(
             'updateScenes',
-            [self._capture_changes()],
+            {'scenes': [self._capture_changes()], 'priority': priority}
         )
 
     async def create_controls(self, *controls):
@@ -63,20 +59,20 @@ class Scene(Resource):
         """
         for control in controls:
             self._controls[control.id] = control
-            control._attach_connection(self)
+            control._attach_scene(self)
 
         return await self._connection.call('createControls', {
             'sceneID': self.id,
-            'controls': [c._resolve_all() for c in controls],
+            'controls': controls,
         })
 
-    def _resolve_all(self):
-        props = super(Scene, self)._resolve_all()
-        props['controls'] = [c._resolve_all() for c in self._controls]
+    def to_json(self):
+        props = super().to_json()
+        props['controls'] = [c.to_json() for c in self._controls]
         return props
 
     def _on_deleted(self, call):
-        super(Scene, self)._on_deleted(call)
+        super()._on_deleted(call)
         for control in self._controls:
             control._on_deleted(call)
 
@@ -106,6 +102,8 @@ class Control(Resource):
 
      - An ``update`` event when the control is updated, with the Call from
        "onControlUpdate".
+
+     - An ``input`` event is fired when input is given on the control.
     """
 
     def __init__(self, control_id, **kwargs):
@@ -115,6 +113,10 @@ class Control(Resource):
 
     def _attach_scene(self, scene):
         self._scene = scene
+        self._attach_connection(scene._connection)
+
+    def _give_input(self, call):
+        self.emit(call.data['input']['event'], call)
 
     async def delete(self):
         """
@@ -138,7 +140,7 @@ class Control(Resource):
 
 class Button(Control):
     def __init__(self, control_id, **kwargs):
-        super(self).__init__(control_id)
+        super().__init__(control_id)
         kwargs['kind'] = 'button'
         self.assign(**kwargs)
 

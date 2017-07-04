@@ -7,6 +7,7 @@ import curses
 import random
 import math
 import asyncio
+import traceback
 
 
 class Sprite:
@@ -39,7 +40,7 @@ class Paddle(Sprite):
 
 
 class Ball(Sprite):
-    def __init__(self, screen, speed_per_frame=1, size=1):
+    def __init__(self, screen, speed_per_frame=2, size=1):
         super(Ball, self).__init__(screen)
         self._size = size
         self._speed = speed_per_frame
@@ -94,6 +95,7 @@ class BaseGame:
         self._ball = Ball(self._screen)
         self._sprites = [self._ball]
         self._fps = 15
+        self._running = True
 
     def _create_paddle(self, **kwargs):
         paddle = Paddle(screen=self._screen, **kwargs)
@@ -103,13 +105,17 @@ class BaseGame:
     def update(self, pressed_key=None):
         raise NotImplementedError()
 
+    def fatal_error(self, e):
+        self._running = False
+        raise e
+
     async def setup(self):
         pass
 
     async def loop(self):
         await self.setup()
 
-        while True:
+        while self._running:
             self._screen.timeout(1)
             pressed_key = self._screen.getch()
             if pressed_key == ord('q'):

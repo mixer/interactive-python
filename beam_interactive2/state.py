@@ -14,27 +14,27 @@ class State(EventEmitter):
         connection = State.connect(
             project_version_id=my_version_id,
             authorization="Bearer " + oauth_token)
-    
+
     The state can work in two modes for handling delivery of events and updates.
     You can use `pump()` calls synchronously within your game loop to apply
     updates that have been queued. Alternately, you can call `pump_async()` to
     signal to that state that you want updates delivered asynchronously, as soon
     as they come in. For example:
-    
+
         # Async delivery. `giveInput` is emitted as soon as any input comes in.
         state.on('giveInput', lambda call: do_the_thing(call))
         state.pump_async()
-        
+
         # Sync delivery. `giveInput` is emitted only during calls to pump()
         state.on('giveInput', lambda call: do_the_thing(call))
         while True:
             my_game_loop.tick()
             state.pump()
-            
+
             # You can also read queues of changes from pump(), if you prefer
-            # to dispatch changes manually: 
+            # to dispatch changes manually:
             # for call in pump(): ...
-    
+
     In both modes, all incoming call are emitted as events on the State
     instance.
 
@@ -44,10 +44,11 @@ class State(EventEmitter):
 
     def __init__(self, connection):
         super(State, self).__init__()
-        self._scenes = {}
+        self._scenes = {'default': Scene('default')}
         self._connection = connection
         self._enable_event_queue = True
         self._event_queue = collections.deque()
+        self._scenes['default']._attach_connection(self._connection)
 
         self.on('onSceneCreate', self._on_scene_create_or_update)
         self.on('onSceneUpdate', self._on_scene_create_or_update)
@@ -55,6 +56,7 @@ class State(EventEmitter):
         self.on('onControlCreate', self._on_control_update_or_create)
         self.on('onControlUpdate', self._on_control_update_or_create)
         self.on('onControlDelete', self._on_control_delete)
+        self.on('giveInput', self._give_input)
 
     @property
     def scenes(self):
@@ -67,11 +69,11 @@ class State(EventEmitter):
         """
         Starts a pump() process working in the background. Events will be
         dispatched asynchronously.
-        
+
         Returns a future that can be used for cancelling the pump, if desired.
         Otherwise the pump will automatically stop once
         the connection is closed.
-        
+
         :rtype: asyncio.Future
         """
         self._enable_event_queue = False
@@ -82,6 +84,8 @@ class State(EventEmitter):
                     self.pump()
             except asyncio.CancelledError:
                 self._enable_event_queue = True
+            except Exception as e:
+                self.emit('error', e)
 
         return asyncio.ensure_future(run(), loop=loop)
 
@@ -90,12 +94,12 @@ class State(EventEmitter):
         pump causes the state to read any updates it has queued up. This
         should usually be called at the start of any game loop where you're
         going to be doing processing of Interactive events.
-        
+
         Any events that have not been read when pump() is called are discarded.
-        
+
         Alternately, you can call pump_async() to have delivery handled for you
         without manual input.
-        
+
         :rtype: Iterator of Calls
         """
         self._event_queue.clear()
@@ -123,6 +127,22 @@ class State(EventEmitter):
 
         return await self._connection.call(
             'createScenes', [s._resolve_all() for s in scenes])
+
+    async def set_ready(self, is_ready=True):
+        """
+        Marks the interactive integration as being ready-to-go. Must be called
+        before controls will appear.
+        :param is_ready: true or false to allow input
+        :return: Reply
+        """
+        return await self._connection.call('ready', {'isReady': is_ready})
+
+    def _give_input(self, call):
+        control_id = call.data['input']['controlID']
+        for scene in self._scenes.values():
+            if control_id in scene.controls:
+                scene.controls[control_id]._give_input(call)
+                break
 
     def _on_scene_delete(self, call):
         if call.data['sceneID'] not in self._scenes:
@@ -152,10 +172,10 @@ class State(EventEmitter):
         """
         Creates a new interactive connection. Most arguments will be passed
         through into the Connection constructor.
-        
-        :param discovery: 
-        :param kwargs: 
-        :return: 
+
+        :param discovery:
+        :param kwargs:
+        :return:
         """
 
         if 'address' not in kwargs:

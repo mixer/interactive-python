@@ -172,7 +172,8 @@ class Connection:
         """
         Encodes and sends a dict payload.
         """
-        self._socket.send(self._encode(json_encoder.encode(payload)))
+        future = self._socket.send(self._encode(json_encoder.encode(payload)))
+        asyncio.ensure_future(future, loop=self._loop)
 
     async def _read_single(self):
         """

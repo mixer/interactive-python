@@ -165,7 +165,7 @@ class Resource(EventEmitter, ChangeTracker):
         :type change: dict
         :type call: Call
         """
-        super().assign(change)
+        self.assign(**change)
         self._mark_synced()
         self.emit('update', call)
 
