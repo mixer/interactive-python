@@ -7,11 +7,12 @@ class Discovery:
     """Discovery is a simple service discovery class which retrieves an
     Interactive host to connect to.
     """
-    def __init__(self, host='https://beam.pro',
-                 path='/api/v1/interactive/hosts', timeout=10):
+    def __init__(self, host='https://mixer.com',
+                 path='/api/v1/interactive/hosts', loop=None, timeout=10):
         self._host = host
         self._path = path
         self._timeout = timeout
+        self._loop = None
 
     async def find(self):
         """Returns the websocket address of an interactive server to connect
@@ -22,7 +23,7 @@ class Discovery:
         # add another dependency and Python doesn't seem to have an asyncio
         # http client in its standard library yet.
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(loop=self._loop) as session:
             async with session.get(self._host + self._path) as res:
                 if res.status >= 300:
                     raise DiscoveryError('Expected a 2xx status code, but'

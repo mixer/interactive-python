@@ -7,7 +7,6 @@ import curses
 import random
 import math
 import asyncio
-import traceback
 
 
 class Sprite:
