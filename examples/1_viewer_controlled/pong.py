@@ -13,7 +13,7 @@ Run this with::
     python -m examples.1_viewer_controlled.pong <ThatLongOAuthToken>
 """
 
-from beam_interactive2 import State, Button, keycode
+from interactive_python import State, Button, keycode
 from sys import argv
 
 from ..engine import BaseGame, run

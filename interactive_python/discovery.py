@@ -5,7 +5,8 @@ from .errors import DiscoveryError, NoServersAvailableError
 
 class Discovery:
     """Discovery is a simple service discovery class which retrieves an
-    Interactive host to connect to.
+    Interactive host to connect to. This is passed into the State by default;
+    you usually should not need to override it.
     """
     def __init__(self, host='https://mixer.com',
                  path='/api/v1/interactive/hosts', loop=None, timeout=10):

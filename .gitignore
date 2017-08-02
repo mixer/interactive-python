@@ -60,3 +60,4 @@ target/
 
 /.idea
 *.iml
+/docs/a_*

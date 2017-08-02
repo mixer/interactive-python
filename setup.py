@@ -2,13 +2,13 @@ import sys
 from setuptools import setup, find_packages
 
 if sys.version_info < (3, 5):
-    raise Exception("beam-interactive-python2 makes use of asyncio, async," +
-                    "and await, and therefore requires Python >= 3.5.x")
+    raise Exception("interactive_python makes use of asyncio, async, and"
+                    "await, and therefore requires Python >= 3.5.x")
 
 setup(
-    name='beam_interactive2',
+    name='interactive_python',
     version='0.1.0',
-    description='Reference game client implementation for Beam Interactive 2',
+    description='Reference API implementation for Mixer Interactive 2',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Programming Language :: Python :: 3.5',
@@ -19,8 +19,8 @@ setup(
         'Topic :: Software Development :: Libraries'
     ],
     author='Connor Peet',
-    author_email='connor@peet.io',
-    url='https://github.com/WatchBeam/beam-interactive-python2',
+    author_email='connor@xbox.com',
+    url='https://github.com/mixer/interactive-python',
     license='MIT',
     packages=find_packages(exclude=['tests']),
     install_requires=['websockets>=3.3', 'varint>=1.0.2', 'pyee>=3.0.3',

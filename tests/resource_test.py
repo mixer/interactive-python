@@ -1,5 +1,5 @@
 import unittest
-from beam_interactive2._util import Resource
+from interactive_python._util import Resource
 
 
 def get_fixture():

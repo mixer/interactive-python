@@ -21,7 +21,7 @@ class OAuthGrant:
 
 class OAuthTokens:
     """OAuthTokens is a bearer from an OAuth access and refresh token retrieved
-    via the `OAuthShortCode`'s ``accepted()`` method.
+    via the :func:`~interactive_python.OAuthShortCode.accepted` method.
     """
 
     def __init__(self, body):
@@ -42,6 +42,7 @@ class OAuthShortCode:
         self._client = client
         self._grant = grant
         self._check_interval = check_interval
+
         self.code = body['code']
         self.expires_at = datetime.datetime.now() + \
                           datetime.timedelta(seconds=body['expires_in'])
@@ -53,7 +54,7 @@ class OAuthShortCode:
 
         :raise ShortCodeAccessDeniedError: if the user denies access
         :raise ShortCodeTimeoutError: if the user doesn't enter
-        :return: OAuthTokens
+        :rtype: OAuthTokens
         """
         address = self._grant.url('/oauth/shortcode/check/' + self._handle)
         while True:
@@ -93,43 +94,48 @@ class OAuthClient:
     them to go to `mixer.com/go <https://mixer.com/go>`_. This library will
     resolve back into your application once they enter that code.
 
-    Here's a full example of what a full usage might look like, with complete
-    error handling:
+    Here's a full example of what a full usage might
+    look like, with error handling:
 
-    .. code::py
+    .. code:: python
 
-        import beam_interactive2 as Interactive
+        import interactive_python as interactive
+        import asyncio
+
         async def get_access_token(client):
             code = await client.get_code()
             print("Go to mixer.com/go and enter {}".format(code.code))
 
             try:
                 return await code.accepted()
-            except Interactive.ShortCodeAccessDeniedError:
+            except interactive.ShortCodeAccessDeniedError:
                 print("The user denied access to our client")
-            except Interactive.ShortCodeTimeoutError:
+            except interactive.ShortCodeTimeoutError:
                 print("Yo, you're too slow! Let's try again...")
                 return await get_access_token(client)
 
-        try:
-            with Interactive.OAuthClient(my_client_id) as client:
+        async def run():
+            with interactive.OAuthClient(my_client_id) as client:
                 token = await get_access_token(client)
                 print("Access token: {}".format(token.access))
-        except Interactive.UnknownShortCodeError as e:
-            print("An unknown error occurred in Mixer: {}".format(e))
+
+        asyncio.get_event_loop().run_until_complete(run())
+
+    :param client_id: Your OAuth client ID
+    :type client_id: string
+    :param client_secret: Your OAuth client secret, if any
+    :type client_secret: string
+    :param host: Base address of the Mixer servers
+    :type host: string
+    :param scopes:  A list of scopes to request. For Interactive, you only
+        need the 'interactive:robot:self' scope
+    :type scopes: list[string]
+    :param loop: asyncio event loop to attach to
+    :type loop: asyncio.Loop
     """
 
     def __init__(self, client_id, client_secret=None, host='https://mixer.com',
                  scopes=['interactive:robot:self'], loop=None):
-        """
-
-        :param client_id: Your OAuth client ID
-        :param client_secret: Your OAuth client secret, if any
-        :param host: Base address of the Mixer servers
-        :param scopes:  A list of scopes to request. For Interactive, you only
-            need the 'interactive:robot:self' scope
-        :param loop: asyncio event loop to attach to
-        """
         self._loop = loop
         self._grant = OAuthGrant(client_id, client_secret, scopes, host)
 
@@ -144,7 +150,8 @@ class OAuthClient:
         """
         Requests a shortcode from the Mixer servers and returns an
         OAuthShortCode handle.
-        :return: OAuthShortCode
+
+        :rtype: OAuthShortCode
         """
         address = self._grant.url('/oauth/shortcode')
         payload = {

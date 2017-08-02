@@ -2,7 +2,7 @@ from unittest.mock import Mock
 import asyncio
 import websockets
 
-from beam_interactive2 import Connection, GzipEncoding
+from interactive_python import Connection, GzipEncoding
 from ._util import AsyncTestCase, async_test, resolve, fixture
 
 

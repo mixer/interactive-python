@@ -1,5 +1,5 @@
 import unittest
-from beam_interactive2 import GzipEncoding
+from interactive_python import GzipEncoding
 from ._util import fixture
 
 samples = 3

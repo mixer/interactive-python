@@ -1,5 +1,5 @@
 import unittest
-from beam_interactive2 import keycode
+from interactive_python import keycode
 
 class TestKeycode(unittest.TestCase):
     def test_gives_aliased_codes(self):
