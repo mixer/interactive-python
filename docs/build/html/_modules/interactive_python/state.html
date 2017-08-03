@@ -1,0 +1,288 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>interactive_python.state &#8212; interactive-python 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for interactive_python.state</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">from</span> <span class="nn">pyee</span> <span class="kn">import</span> <span class="n">EventEmitter</span>
+
+<span class="kn">from</span> <span class="nn">.connection</span> <span class="kn">import</span> <span class="n">Connection</span>
+<span class="kn">from</span> <span class="nn">.discovery</span> <span class="kn">import</span> <span class="n">Discovery</span>
+<span class="kn">from</span> <span class="nn">.scene</span> <span class="kn">import</span> <span class="n">Scene</span>
+
+
+<div class="viewcode-block" id="State"><a class="viewcode-back" href="../../api.html#interactive_python.State">[docs]</a><span class="k">class</span> <span class="nc">State</span><span class="p">(</span><span class="n">EventEmitter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;State is the state container for a single interactive session.</span>
+<span class="sd">    It should usually be created via the static</span>
+<span class="sd">    :func:`~interactive_python.State.connect` method::</span>
+
+<span class="sd">        connection = State.connect(</span>
+<span class="sd">            project_version_id=my_version_id,</span>
+<span class="sd">            authorization=&quot;Bearer &quot; + oauth_token)</span>
+
+<span class="sd">    The Scene is a pyee.EventEmitter. When calls come down, they&#39;re always</span>
+<span class="sd">    emitted on the State by their method name. So, for instance, you can</span>
+<span class="sd">    listen to &quot;onSceneCreate&quot; or &quot;onParticipantJoin&quot; on the scene::</span>
+
+<span class="sd">        def greet(call):</span>
+<span class="sd">            for participant in call.data[&#39;participants&#39;]:</span>
+<span class="sd">                print(&#39;Welcome {}!&#39;, participant[&#39;username&#39;])</span>
+
+<span class="sd">        scene.on(&#39;onParticipantJoin&#39;, greet)</span>
+
+<span class="sd">    The state can work in two modes for handling delivery of events and updates.</span>
+<span class="sd">    You can use `pump()` calls synchronously within your game loop to apply</span>
+<span class="sd">    updates that have been queued. Alternately, you can call ``pump_async()`` to</span>
+<span class="sd">    signal to that state that you want updates delivered asynchronously, as soon</span>
+<span class="sd">    as they come in. For example::</span>
+
+<span class="sd">        # Async delivery. `giveInput` is emitted as soon as any input comes in.</span>
+<span class="sd">        state.on(&#39;giveInput&#39;, lambda call: do_the_thing(call))</span>
+<span class="sd">        state.pump_async()</span>
+
+<span class="sd">        # Sync delivery. `giveInput` is emitted only during calls to pump()</span>
+<span class="sd">        state.on(&#39;giveInput&#39;, lambda call: do_the_thing(call))</span>
+<span class="sd">        while True:</span>
+<span class="sd">            my_game_loop.tick()</span>
+<span class="sd">            state.pump()</span>
+
+<span class="sd">            # You can also read queues of changes from pump(), if you prefer</span>
+<span class="sd">            # to dispatch changes manually:</span>
+<span class="sd">            # for call in pump(): ...</span>
+
+<span class="sd">    In both modes, all incoming call are emitted as events on the State</span>
+<span class="sd">    instance.</span>
+
+<span class="sd">    :param connection: The websocket connection to interactive.</span>
+<span class="sd">    :type connection: Connection</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">connection</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">State</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;default&#39;</span><span class="p">:</span> <span class="n">Scene</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">)}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span> <span class="o">=</span> <span class="n">connection</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enable_event_queue</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">deque</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">_attach_connection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;onSceneCreate&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_scene_create_or_update</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;onSceneUpdate&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_scene_create_or_update</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;onSceneDelete&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_scene_delete</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;onControlCreate&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_control_update_or_create</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;onControlUpdate&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_control_update_or_create</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;onControlDelete&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_control_delete</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;giveInput&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_give_input</span><span class="p">)</span>
+
+<div class="viewcode-block" id="State.scene"><a class="viewcode-back" href="../../api.html#interactive_python.State.scene">[docs]</a>    <span class="k">def</span> <span class="nf">scene</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Looks up an existing scene by ID. It returns None if the scene does</span>
+<span class="sd">        not exist.</span>
+
+<span class="sd">        :param name: The name of the scene to look up</span>
+<span class="sd">        :type name: str</span>
+<span class="sd">        :return:</span>
+<span class="sd">        :rtype: Scene</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="State.pump_async"><a class="viewcode-back" href="../../api.html#interactive_python.State.pump_async">[docs]</a>    <span class="k">def</span> <span class="nf">pump_async</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loop</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Starts a pump() process working in the background. Events will be</span>
+<span class="sd">        dispatched asynchronously.</span>
+
+<span class="sd">        Returns a future that can be used for cancelling the pump, if desired.</span>
+<span class="sd">        Otherwise the pump will automatically stop once</span>
+<span class="sd">        the connection is closed.</span>
+
+<span class="sd">        :rtype: asyncio.Future</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enable_event_queue</span> <span class="o">=</span> <span class="bp">False</span>
+
+        <span class="n">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">():</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">while</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">has_packet</span><span class="p">():</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">pump</span><span class="p">()</span>
+            <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_enable_event_queue</span> <span class="o">=</span> <span class="bp">True</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">ensure_future</span><span class="p">(</span><span class="n">run</span><span class="p">(),</span> <span class="n">loop</span><span class="o">=</span><span class="n">loop</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="State.pump"><a class="viewcode-back" href="../../api.html#interactive_python.State.pump">[docs]</a>    <span class="k">def</span> <span class="nf">pump</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        pump causes the state to read any updates it has queued up. This</span>
+<span class="sd">        should usually be called at the start of any game loop where you&#39;re</span>
+<span class="sd">        going to be doing processing of Interactive events.</span>
+
+<span class="sd">        Any events that have not been read when pump() is called are discarded.</span>
+
+<span class="sd">        Alternately, you can call pump_async() to have delivery handled for you</span>
+<span class="sd">        without manual input.</span>
+
+<span class="sd">        :rtype: Iterator of Calls</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="n">call</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">get_packet</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">call</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">call</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">call</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enable_event_queue</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_queue</span></div>
+
+<div class="viewcode-block" id="State.create_scenes"><a class="viewcode-back" href="../../api.html#interactive_python.State.create_scenes">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">create_scenes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">scenes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Can be called with one or more Scenes to add them to Interactive.</span>
+<span class="sd">        :param scenes: list of scenes to create</span>
+<span class="sd">        :type scenes: Scene</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">scene</span> <span class="ow">in</span> <span class="n">scenes</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">[</span><span class="n">scene</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">scene</span>
+            <span class="n">scene</span><span class="o">.</span><span class="n">_attach_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">call</span><span class="p">(</span>
+            <span class="s1">&#39;createScenes&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">_resolve_all</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">scenes</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="State.set_ready"><a class="viewcode-back" href="../../api.html#interactive_python.State.set_ready">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">set_ready</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">is_ready</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Marks the interactive integration as being ready-to-go. Must be called</span>
+<span class="sd">        before controls will appear.</span>
+
+<span class="sd">        :param is_ready: True or False to allow input</span>
+<span class="sd">        :rtype: Reply</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="s1">&#39;ready&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;isReady&#39;</span><span class="p">:</span> <span class="n">is_ready</span><span class="p">})</span></div>
+
+    <span class="k">def</span> <span class="nf">_give_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="n">control_id</span> <span class="o">=</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;input&#39;</span><span class="p">][</span><span class="s1">&#39;controlID&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">scene</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">control_id</span> <span class="ow">in</span> <span class="n">scene</span><span class="o">.</span><span class="n">controls</span><span class="p">:</span>
+                <span class="n">scene</span><span class="o">.</span><span class="n">controls</span><span class="p">[</span><span class="n">control_id</span><span class="p">]</span><span class="o">.</span><span class="n">_give_input</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+                <span class="k">break</span>
+
+    <span class="k">def</span> <span class="nf">_on_scene_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">scenes</span><span class="p">[</span><span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">scenes</span><span class="p">[</span><span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]]</span>
+
+    <span class="k">def</span> <span class="nf">_on_scene_create_or_update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">scene</span> <span class="ow">in</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">scenes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">scene</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">[</span><span class="n">scene</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Scene</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scene</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">])</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">[</span><span class="n">scene</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">_apply_changes</span><span class="p">(</span><span class="n">scene</span><span class="p">,</span> <span class="n">call</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_on_control_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">[</span><span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">_on_control_delete</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_on_control_update_or_create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scenes</span><span class="p">[</span><span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;sceneID&#39;</span><span class="p">]]</span><span class="o">.</span>\
+                <span class="n">_on_control_update_or_create</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+
+<div class="viewcode-block" id="State.connect"><a class="viewcode-back" href="../../api.html#interactive_python.State.connect">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="n">async</span> <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="n">discovery</span><span class="o">=</span><span class="n">Discovery</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a new interactive connection. Most arguments will be passed</span>
+<span class="sd">        through into the Connection constructor.</span>
+
+<span class="sd">        :param discovery:</span>
+<span class="sd">        :type discovery: Discovery</span>
+<span class="sd">        :param kwargs:</span>
+<span class="sd">        :rtype: State</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s1">&#39;address&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;address&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">await</span> <span class="n">discovery</span><span class="o">.</span><span class="n">find</span><span class="p">()</span>
+
+        <span class="n">connection</span> <span class="o">=</span> <span class="n">Connection</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">await</span> <span class="n">connection</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">State</span><span class="p">(</span><span class="n">connection</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;Microsoft.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

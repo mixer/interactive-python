@@ -1,0 +1,252 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>interactive_python.oauth &#8212; interactive-python 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for interactive_python.oauth</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">aiohttp</span>
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+
+<span class="kn">from</span> <span class="nn">.errors</span> <span class="kn">import</span> <span class="n">UnknownShortCodeError</span><span class="p">,</span> <span class="n">ShortCodeAccessDeniedError</span><span class="p">,</span> \
+    <span class="n">ShortCodeTimeoutError</span>
+
+
+<span class="k">class</span> <span class="nc">OAuthGrant</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Internal DTO for an OAuth grant&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client_id</span><span class="p">,</span> <span class="n">client_secret</span><span class="p">,</span> <span class="n">scopes</span><span class="p">,</span> <span class="n">host</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client_id</span> <span class="o">=</span> <span class="n">client_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client_secret</span> <span class="o">=</span> <span class="n">client_secret</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scopes</span> <span class="o">=</span> <span class="n">scopes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">host</span>
+
+    <span class="k">def</span> <span class="nf">url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span> <span class="o">+</span> <span class="s1">&#39;/api/v1&#39;</span> <span class="o">+</span> <span class="n">path</span>
+
+
+<div class="viewcode-block" id="OAuthTokens"><a class="viewcode-back" href="../../api.html#interactive_python.OAuthTokens">[docs]</a><span class="k">class</span> <span class="nc">OAuthTokens</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;OAuthTokens is a bearer from an OAuth access and refresh token retrieved</span>
+<span class="sd">    via the :func:`~interactive_python.OAuthShortCode.accepted` method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">access</span> <span class="o">=</span> <span class="n">body</span><span class="p">[</span><span class="s1">&#39;access_token&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">refresh</span> <span class="o">=</span> <span class="n">body</span><span class="p">[</span><span class="s1">&#39;refresh_token&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">expires_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> \
+                          <span class="n">datetime</span><span class="o">.</span><span class="n">timedelta</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="n">body</span><span class="p">[</span><span class="s1">&#39;expires_in&#39;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="OAuthShortCode"><a class="viewcode-back" href="../../api.html#interactive_python.OAuthShortCode">[docs]</a><span class="k">class</span> <span class="nc">OAuthShortCode</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OAuthShortCode is the shortcode handle returned by the `OAuthClient`. See</span>
+<span class="sd">    documentation on that class for more information and usage examples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grant</span><span class="p">,</span> <span class="n">client</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">check_interval</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle</span> <span class="o">=</span> <span class="n">body</span><span class="p">[</span><span class="s1">&#39;handle&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_client</span> <span class="o">=</span> <span class="n">client</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span> <span class="o">=</span> <span class="n">grant</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_interval</span> <span class="o">=</span> <span class="n">check_interval</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">code</span> <span class="o">=</span> <span class="n">body</span><span class="p">[</span><span class="s1">&#39;code&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">expires_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> \
+                          <span class="n">datetime</span><span class="o">.</span><span class="n">timedelta</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="n">body</span><span class="p">[</span><span class="s1">&#39;expires_in&#39;</span><span class="p">])</span>
+
+<div class="viewcode-block" id="OAuthShortCode.accepted"><a class="viewcode-back" href="../../api.html#interactive_python.OAuthShortCode.accepted">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">accepted</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Waits until the user enters the shortcode on the Mixer website. Throws</span>
+<span class="sd">        if they deny access or don&#39;t enter the code in time.</span>
+
+<span class="sd">        :raise ShortCodeAccessDeniedError: if the user denies access</span>
+<span class="sd">        :raise ShortCodeTimeoutError: if the user doesn&#39;t enter</span>
+<span class="sd">        :rtype: OAuthTokens</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">address</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="o">.</span><span class="n">url</span><span class="p">(</span><span class="s1">&#39;/oauth/shortcode/check/&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handle</span><span class="p">)</span>
+        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="n">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_check_interval</span><span class="p">)</span>
+
+            <span class="n">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">address</span><span class="p">)</span> <span class="k">as</span> <span class="n">res</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_tokens</span><span class="p">(</span><span class="n">await</span> <span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
+                <span class="k">elif</span> <span class="n">res</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">204</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">elif</span> <span class="n">res</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">403</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">ShortCodeAccessDeniedError</span><span class="p">(</span><span class="s1">&#39;User has denied access&#39;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">res</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">ShortCodeTimeoutError</span><span class="p">(</span><span class="s1">&#39;Timeout waiting for the user &#39;</span>
+                                                <span class="s1">&#39;to enter the OAuth shortcode.&#39;</span><span class="p">)</span></div>
+
+    <span class="n">async</span> <span class="k">def</span> <span class="nf">_get_tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+        <span class="n">address</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="o">.</span><span class="n">url</span><span class="p">(</span><span class="s1">&#39;/oauth/token&#39;</span><span class="p">)</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;client_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="o">.</span><span class="n">client_id</span><span class="p">,</span>
+            <span class="s1">&#39;grant_type&#39;</span><span class="p">:</span> <span class="s1">&#39;authorization_code&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="n">body</span><span class="p">[</span><span class="s1">&#39;code&#39;</span><span class="p">],</span>
+        <span class="p">}</span>
+
+        <span class="n">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span> <span class="k">as</span> <span class="n">res</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="mi">200</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UnknownShortCodeError</span><span class="p">(</span><span class="s1">&#39;Expected a 2xx status code, but&#39;</span>
+                                            <span class="s1">&#39;got {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">status</span><span class="p">))</span>
+
+            <span class="k">return</span> <span class="n">OAuthTokens</span><span class="p">(</span><span class="n">await</span> <span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="OAuthClient"><a class="viewcode-back" href="../../api.html#interactive_python.OAuthClient">[docs]</a><span class="k">class</span> <span class="nc">OAuthClient</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The OAuth client implements our shortcode OAuth flow. From a user&#39;s</span>
+<span class="sd">    perspective, your app or game displays a 6-digit code to them and prompts</span>
+<span class="sd">    them to go to `mixer.com/go &lt;https://mixer.com/go&gt;`_. This library will</span>
+<span class="sd">    resolve back into your application once they enter that code.</span>
+
+<span class="sd">    Here&#39;s a full example of what a full usage might</span>
+<span class="sd">    look like, with error handling:</span>
+
+<span class="sd">    .. code:: python</span>
+
+<span class="sd">        import interactive_python as interactive</span>
+<span class="sd">        import asyncio</span>
+
+<span class="sd">        async def get_access_token(client):</span>
+<span class="sd">            code = await client.get_code()</span>
+<span class="sd">            print(&quot;Go to mixer.com/go and enter {}&quot;.format(code.code))</span>
+
+<span class="sd">            try:</span>
+<span class="sd">                return await code.accepted()</span>
+<span class="sd">            except interactive.ShortCodeAccessDeniedError:</span>
+<span class="sd">                print(&quot;The user denied access to our client&quot;)</span>
+<span class="sd">            except interactive.ShortCodeTimeoutError:</span>
+<span class="sd">                print(&quot;Yo, you&#39;re too slow! Let&#39;s try again...&quot;)</span>
+<span class="sd">                return await get_access_token(client)</span>
+
+<span class="sd">        async def run():</span>
+<span class="sd">            with interactive.OAuthClient(my_client_id) as client:</span>
+<span class="sd">                token = await get_access_token(client)</span>
+<span class="sd">                print(&quot;Access token: {}&quot;.format(token.access))</span>
+
+<span class="sd">        asyncio.get_event_loop().run_until_complete(run())</span>
+
+<span class="sd">    :param client_id: Your OAuth client ID</span>
+<span class="sd">    :type client_id: string</span>
+<span class="sd">    :param client_secret: Your OAuth client secret, if any</span>
+<span class="sd">    :type client_secret: string</span>
+<span class="sd">    :param host: Base address of the Mixer servers</span>
+<span class="sd">    :type host: string</span>
+<span class="sd">    :param scopes:  A list of scopes to request. For Interactive, you only</span>
+<span class="sd">        need the &#39;interactive:robot:self&#39; scope</span>
+<span class="sd">    :type scopes: list[string]</span>
+<span class="sd">    :param loop: asyncio event loop to attach to</span>
+<span class="sd">    :type loop: asyncio.Loop</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client_id</span><span class="p">,</span> <span class="n">client_secret</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s1">&#39;https://mixer.com&#39;</span><span class="p">,</span>
+                 <span class="n">scopes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;interactive:robot:self&#39;</span><span class="p">],</span> <span class="n">loop</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_loop</span> <span class="o">=</span> <span class="n">loop</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span> <span class="o">=</span> <span class="n">OAuthGrant</span><span class="p">(</span><span class="n">client_id</span><span class="p">,</span> <span class="n">client_secret</span><span class="p">,</span> <span class="n">scopes</span><span class="p">,</span> <span class="n">host</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_client</span> <span class="o">=</span> <span class="n">aiohttp</span><span class="o">.</span><span class="n">ClientSession</span><span class="p">(</span><span class="n">loop</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_loop</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_client</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+<div class="viewcode-block" id="OAuthClient.get_code"><a class="viewcode-back" href="../../api.html#interactive_python.OAuthClient.get_code">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">get_code</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Requests a shortcode from the Mixer servers and returns an</span>
+<span class="sd">        OAuthShortCode handle.</span>
+
+<span class="sd">        :rtype: OAuthShortCode</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">address</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="o">.</span><span class="n">url</span><span class="p">(</span><span class="s1">&#39;/oauth/shortcode&#39;</span><span class="p">)</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;client_id&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="o">.</span><span class="n">client_id</span><span class="p">,</span>
+            <span class="s1">&#39;client_secret&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="o">.</span><span class="n">client_secret</span><span class="p">,</span>
+            <span class="s1">&#39;scope&#39;</span><span class="p">:</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="o">.</span><span class="n">scopes</span><span class="p">)</span>
+        <span class="p">}</span>
+
+        <span class="n">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span> <span class="k">as</span> <span class="n">res</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status</span> <span class="o">&gt;=</span> <span class="mi">300</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">UnknownShortCodeError</span><span class="p">(</span><span class="s1">&#39;Expected a 2xx status code, but&#39;</span>
+                                            <span class="s1">&#39;got {}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">status</span><span class="p">))</span>
+
+            <span class="k">return</span> <span class="n">OAuthShortCode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_grant</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client</span><span class="p">,</span> <span class="n">await</span> <span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">())</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;Microsoft.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

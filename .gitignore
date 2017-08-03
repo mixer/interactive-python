@@ -13,7 +13,7 @@ __pycache__/
 .Python
 env/
 venv/
-build/
+/build/
 develop-eggs/
 dist/
 downloads/
@@ -60,4 +60,3 @@ target/
 
 /.idea
 *.iml
-/docs/a_*

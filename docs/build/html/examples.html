@@ -1,0 +1,232 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Runnable Examples &#8212; interactive-python 1.0.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="API" href="api.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="runnable-examples">
+<h1>Runnable Examples<a class="headerlink" href="#runnable-examples" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="oauth-flow">
+<h2>OAuth Flow<a class="headerlink" href="#oauth-flow" title="Permalink to this headline">¶</a></h2>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The runnable source for this can be found in the <a class="reference external" href="https://github.com/mixer/interactive-python/blob/master/examples/2_shortcode_oauth/oauth.py">examples/2_shortcode_oauth</a> folder of this repo.</p>
+</div>
+<p>This example shows you how to use the shortcode OAuth flow to get an access token to connect to Interactive. For development you can <a class="reference external" href="interactive.mixer.com/request">manually request a token</a>, but the shortcode flow provides a better experience to users!</p>
+<div class="code python highlight-python"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">argv</span>
+
+<span class="n">async</span> <span class="k">def</span> <span class="nf">get_access_token</span><span class="p">(</span><span class="n">client</span><span class="p">):</span>
+    <span class="n">code</span> <span class="o">=</span> <span class="n">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get_code</span><span class="p">()</span>
+    <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Go to mixer.com/go and enter {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">code</span><span class="p">))</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="n">code</span><span class="o">.</span><span class="n">accepted</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">interactive</span><span class="o">.</span><span class="n">ShortCodeAccessDeniedError</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;The user denied access to our client&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">interactive</span><span class="o">.</span><span class="n">ShortCodeTimeoutError</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Yo, you&#39;re too slow! Let&#39;s try again...&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="n">get_access_token</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+
+<span class="n">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">():</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">interactive</span><span class="o">.</span><span class="n">OAuthClient</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+            <span class="n">token</span> <span class="o">=</span> <span class="n">await</span> <span class="n">get_access_token</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+            <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Access token: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">token</span><span class="o">.</span><span class="n">access</span><span class="p">))</span>
+    <span class="k">except</span> <span class="n">interactive</span><span class="o">.</span><span class="n">UnknownShortCodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;An unknown error occurred in Mixer: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="pong">
+<h2>Pong<a class="headerlink" href="#pong" title="Permalink to this headline">¶</a></h2>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The runnable source for this can be found in the <a class="reference external" href="https://github.com/mixer/interactive-python/blob/master/examples/1_viewer_controlled/pong.py">examples/1_viewer_controlled</a> folder of this repo.</p>
+</div>
+<p>For an initial example, we’ll create a small pong game. We already wrote a tiny game engine that can be used to create a two player game like so:</p>
+<div class="code python highlight-python"><div class="highlight"><pre><span></span>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_paddle</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_screen_height</span><span class="o">//</span><span class="mi">6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_paddle</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_screen_width</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                                             <span class="n">height</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_screen_height</span><span class="o">//</span><span class="mi">6</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pressed_key</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">pressed_key</span> <span class="o">==</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;s&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">pressed_key</span> <span class="o">==</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;w&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pressed_key</span> <span class="o">==</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;k&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">pressed_key</span> <span class="o">==</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;i&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ball</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Let’s make it Interactive!</p>
+<div class="code python highlight-python"><div class="highlight"><pre><span></span>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_paddle</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_screen_height</span><span class="o">//</span><span class="mi">6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_paddle</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_screen_width</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                                             <span class="n">height</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_screen_height</span><span class="o">//</span><span class="mi">4</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_interactive</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="n">async</span> <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Called automatically by our game engine to boot the game. We&#39;ll create</span>
+<span class="sd">        an interactive connection here! I&#39;ve hard-coded a blank project to use.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">interactive</span> <span class="o">=</span> <span class="n">await</span> <span class="n">State</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">authorization</span><span class="o">=</span><span class="s2">&quot;Bearer &quot;</span> <span class="o">+</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                                              <span class="n">project_version_id</span><span class="o">=</span><span class="mi">42489</span><span class="p">,</span>
+                                              <span class="n">project_sharecode</span><span class="o">=</span><span class="s1">&#39;rheo1hre&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Error connecting to interactive&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_interactive</span> <span class="o">=</span> <span class="n">interactive</span>
+        <span class="n">interactive</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">fatal_error</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+
+        <span class="n">interactive</span><span class="o">.</span><span class="n">pump_async</span><span class="p">()</span>
+        <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_setup_controls</span><span class="p">()</span>
+
+    <span class="n">async</span> <span class="k">def</span> <span class="nf">_setup_controls</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        All the control setup! Alternately, you can design the controls in</span>
+<span class="sd">        the Interactive Studio, but we&#39;ll do them programmatically</span>
+<span class="sd">        for demonstration purposes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">up</span> <span class="o">=</span> <span class="n">Button</span><span class="p">(</span>
+            <span class="n">control_id</span><span class="o">=</span><span class="s1">&#39;up&#39;</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="s1">&#39;Up&#39;</span><span class="p">,</span>
+            <span class="n">keycode</span><span class="o">=</span><span class="n">keycode</span><span class="o">.</span><span class="n">up</span><span class="p">,</span>
+            <span class="n">position</span><span class="o">=</span><span class="p">[</span>
+                <span class="p">{</span><span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="s1">&#39;large&#39;</span><span class="p">,</span> <span class="s1">&#39;width&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;height&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">up</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;mousedown&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">call</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">down</span> <span class="o">=</span> <span class="n">Button</span><span class="p">(</span>
+            <span class="n">control_id</span><span class="o">=</span><span class="s1">&#39;down&#39;</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="s1">&#39;Down&#39;</span><span class="p">,</span>
+            <span class="n">keycode</span><span class="o">=</span><span class="n">keycode</span><span class="o">.</span><span class="n">down</span><span class="p">,</span>
+            <span class="n">position</span><span class="o">=</span><span class="p">[</span>
+                <span class="p">{</span><span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="s1">&#39;large&#39;</span><span class="p">,</span> <span class="s1">&#39;width&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;height&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
+            <span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">down</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;mousedown&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">call</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interactive</span><span class="o">.</span><span class="n">scenes</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">create_controls</span><span class="p">(</span><span class="n">up</span><span class="p">,</span> <span class="n">down</span><span class="p">)</span>
+        <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interactive</span><span class="o">.</span><span class="n">set_ready</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pressed_key</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">pressed_key</span> <span class="o">==</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;s&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">pressed_key</span> <span class="o">==</span> <span class="nb">ord</span><span class="p">(</span><span class="s1">&#39;w&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ball</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_player_1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_player_2</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Runnable Examples</a><ul>
+<li><a class="reference internal" href="#oauth-flow">OAuth Flow</a></li>
+<li><a class="reference internal" href="#pong">Pong</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="api.html" title="previous chapter">API</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/examples.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;Microsoft.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/examples.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

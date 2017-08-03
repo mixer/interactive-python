@@ -1,0 +1,248 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>interactive_python.scene &#8212; interactive-python 1.0.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for interactive_python.scene</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">._util</span> <span class="kn">import</span> <span class="n">Resource</span>
+
+
+<div class="viewcode-block" id="Scene"><a class="viewcode-back" href="../../api.html#interactive_python.Scene">[docs]</a><span class="k">class</span> <span class="nc">Scene</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Scene is a container for controls in interactive. Groups can be assigned</span>
+<span class="sd">    to scenes. It emits:</span>
+
+<span class="sd">     - A ``delete`` event when the scene is deleted, with the</span>
+<span class="sd">       :class:`~interactive_python.Call` from &quot;onSceneDelete&quot;.</span>
+
+<span class="sd">     - An ``update`` event when the scene is updated, with the</span>
+<span class="sd">       :class:`~interactive_python.Call` from  &quot;onSceneUpdate&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Scene</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">scene_id</span><span class="p">,</span> <span class="n">id_property</span><span class="o">=</span><span class="s1">&#39;sceneID&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controls</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_control_kinds</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;button&#39;</span><span class="p">:</span> <span class="n">Button</span><span class="p">,</span>
+            <span class="s1">&#39;joystick&#39;</span><span class="p">:</span> <span class="n">Joystick</span><span class="p">,</span>
+        <span class="p">}</span>
+
+<div class="viewcode-block" id="Scene.delete"><a class="viewcode-back" href="../../api.html#interactive_python.Scene.delete">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reassign_scene_id</span><span class="o">=</span><span class="s1">&#39;default&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Deletes the scene from Interactive. Takes the id of the scene</span>
+<span class="sd">        to reassign any groups who are on that scene to.</span>
+<span class="sd">        :param reassign_scene_id:</span>
+<span class="sd">        :type reassign_scene_id: str</span>
+<span class="sd">        :rtype: None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connection</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="s1">&#39;deleteScene&#39;</span><span class="p">,</span> <span class="p">{</span>
+            <span class="s1">&#39;sceneID&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;reassignSceneID&#39;</span><span class="p">:</span> <span class="n">reassign_scene_id</span><span class="p">,</span>
+        <span class="p">})</span></div>
+
+<div class="viewcode-block" id="Scene.update"><a class="viewcode-back" href="../../api.html#interactive_python.Scene.update">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">priority</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves all changes updates made to the scene.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connection</span><span class="o">.</span><span class="n">call</span><span class="p">(</span>
+            <span class="s1">&#39;updateScenes&#39;</span><span class="p">,</span>
+            <span class="p">{</span><span class="s1">&#39;scenes&#39;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_capture_changes</span><span class="p">()],</span> <span class="s1">&#39;priority&#39;</span><span class="p">:</span> <span class="n">priority</span><span class="p">}</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Scene.create_controls"><a class="viewcode-back" href="../../api.html#interactive_python.Scene.create_controls">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">create_controls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">controls</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Can be called with one or more Controls to add them to to the scene.</span>
+<span class="sd">        :param controls: list of controls to create</span>
+<span class="sd">        :type controls: List[Control]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">control</span> <span class="ow">in</span> <span class="n">controls</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">[</span><span class="n">control</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">control</span>
+            <span class="n">control</span><span class="o">.</span><span class="n">_attach_scene</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connection</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="s1">&#39;createControls&#39;</span><span class="p">,</span> <span class="p">{</span>
+            <span class="s1">&#39;sceneID&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;controls&#39;</span><span class="p">:</span> <span class="n">controls</span><span class="p">,</span>
+        <span class="p">})</span></div>
+
+    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">props</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+        <span class="n">props</span><span class="p">[</span><span class="s1">&#39;controls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">props</span>
+
+    <span class="k">def</span> <span class="nf">_on_deleted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_on_deleted</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">control</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">:</span>
+            <span class="n">control</span><span class="o">.</span><span class="n">_on_deleted</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_on_control_delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">control_id</span> <span class="ow">in</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;controlIDs&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">control_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">[</span><span class="n">control_id</span><span class="p">]</span><span class="o">.</span><span class="n">_on_deleted</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+                <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">[</span><span class="n">control_id</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_on_control_update_or_create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">update</span> <span class="ow">in</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;controls&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">update</span><span class="p">[</span><span class="s1">&#39;controlID&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">:</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_control_kinds</span><span class="p">[</span><span class="n">update</span><span class="p">[</span><span class="s1">&#39;kind&#39;</span><span class="p">]](</span><span class="n">update</span><span class="p">[</span><span class="s1">&#39;controlID&#39;</span><span class="p">])</span>
+                <span class="n">c</span><span class="o">.</span><span class="n">_attach_connection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connection</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">[</span><span class="n">update</span><span class="p">[</span><span class="s1">&#39;controlID&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">c</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">[</span><span class="n">update</span><span class="p">[</span><span class="s1">&#39;controlID&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">_apply_changes</span><span class="p">(</span><span class="n">update</span><span class="p">,</span> <span class="n">call</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Control"><a class="viewcode-back" href="../../api.html#interactive_python.Control">[docs]</a><span class="k">class</span> <span class="nc">Control</span><span class="p">(</span><span class="n">Resource</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Control is a structure on which participants in interactive provide input.</span>
+<span class="sd">    It emits:</span>
+
+<span class="sd">     - A ``delete`` event when the control is deleted, with the</span>
+<span class="sd">       :class:`~interactive_python.Call` from &quot;onControlDelete&quot;.</span>
+
+<span class="sd">     - An ``update`` event when the control is updated, with the</span>
+<span class="sd">       :class:`~interactive_python.Call` from &quot;onControlUpdate&quot;.</span>
+
+<span class="sd">     - Other kinds events are fired when input is given on the control, like</span>
+<span class="sd">       ``mousedown`` for buttons or ``move`` for joysticks. They&#39;re fired with</span>
+<span class="sd">       the :class:`~interactive_python.Call` that triggered them.</span>
+
+<span class="sd">    Here&#39;s an example of creating a button and listening for clicks::</span>
+
+<span class="sd">        btn = Button(</span>
+<span class="sd">            control_id=&#39;click_me&#39;,</span>
+<span class="sd">            text=&#39;Click Me!&#39;,</span>
+<span class="sd">            keycode=keycode.space,</span>
+<span class="sd">            position=[</span>
+<span class="sd">                {&#39;size&#39;: &#39;large&#39;, &#39;width&#39;: 5, &#39;height&#39;: 5, &#39;x&#39;: 0, &#39;y&#39;: 0},</span>
+<span class="sd">            ],</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Logs the call to the console whenever the button is clicked</span>
+<span class="sd">        btn.on(&#39;mousedown&#39;, lambda call: print(call))</span>
+
+<span class="sd">        await state.scene(&#39;default&#39;).create_controls(btn)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">control_id</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Control</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">control_id</span><span class="p">,</span> <span class="n">id_property</span><span class="o">=</span><span class="s1">&#39;controlID&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scene</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_attach_scene</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scene</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scene</span> <span class="o">=</span> <span class="n">scene</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_attach_connection</span><span class="p">(</span><span class="n">scene</span><span class="o">.</span><span class="n">_connection</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_give_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;input&#39;</span><span class="p">][</span><span class="s1">&#39;event&#39;</span><span class="p">],</span> <span class="n">call</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Control.delete"><a class="viewcode-back" href="../../api.html#interactive_python.Control.delete">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Deletes the control</span>
+<span class="sd">        :return: None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connection</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="s1">&#39;deleteControls&#39;</span><span class="p">,</span> <span class="p">{</span>
+            <span class="s1">&#39;sceneID&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scene</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;controlIDs&#39;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">],</span>
+        <span class="p">})</span></div>
+
+<div class="viewcode-block" id="Control.update"><a class="viewcode-back" href="../../api.html#interactive_python.Control.update">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves all changes updates made to the control.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connection</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="s1">&#39;updateControls&#39;</span><span class="p">,</span> <span class="p">{</span>
+            <span class="s1">&#39;sceneID&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scene</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="s1">&#39;controls&#39;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_capture_changes</span><span class="p">()],</span>
+        <span class="p">})</span></div></div>
+
+
+<div class="viewcode-block" id="Button"><a class="viewcode-back" href="../../api.html#interactive_python.Button">[docs]</a><span class="k">class</span> <span class="nc">Button</span><span class="p">(</span><span class="n">Control</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">control_id</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">control_id</span><span class="p">)</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;kind&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;button&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Joystick"><a class="viewcode-back" href="../../api.html#interactive_python.Joystick">[docs]</a><span class="k">class</span> <span class="nc">Joystick</span><span class="p">(</span><span class="n">Control</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">control_id</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">control_id</span><span class="p">)</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;kind&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;joystick&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;Microsoft.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

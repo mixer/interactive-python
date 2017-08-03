@@ -1,0 +1,920 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>API &#8212; interactive-python 1.0.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Runnable Examples" href="examples.html" />
+    <link rel="prev" title="Mixer Interactive Python API" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="api">
+<h1>API<a class="headerlink" href="#api" title="Permalink to this headline">¶</a></h1>
+<p>This document describes the Python API to connect to Mixer’s Interactive service. We assume you’re already somewhat familiar with Interactive. If you’re not, check our <a class="reference external" href="https://dev.mixer.com/reference/interactive/index.html">reference guide</a>.</p>
+<p>To connect to Interactive, you first need to have an Interactive project and some means of authentication. You’ll want to <a class="reference external" href="https://dev.mixer.com/reference/interactive/index.html#creating-an-interactive-project">create an Interactive project</a> on Mixer and register an <a class="reference external" href="https://dev.mixer.com/reference/oauth/index.html#registering">OAuth client</a> while you’re there. For most integrations, you can leave the OAuth “redirect URLs” empty, and you should not request a secret key.</p>
+<p>You can now use the OAuthClient class with your OAuth client ID to get an access token.</p>
+<div class="section" id="oauth">
+<h2>OAuth<a class="headerlink" href="#oauth" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="interactive_python.OAuthClient">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">OAuthClient</code><span class="sig-paren">(</span><em>client_id, client_secret=None, host='https://mixer.com', scopes=['interactive:robot:self'], loop=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/oauth.html#OAuthClient"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.OAuthClient" title="Permalink to this definition">¶</a></dt>
+<dd><p>The OAuth client implements our shortcode OAuth flow. From a user’s
+perspective, your app or game displays a 6-digit code to them and prompts
+them to go to <a class="reference external" href="https://mixer.com/go">mixer.com/go</a>. This library will
+resolve back into your application once they enter that code.</p>
+<p>Here’s a full example of what a full usage might
+look like, with error handling:</p>
+<div class="code python highlight-python"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">interactive_python</span> <span class="kn">as</span> <span class="nn">interactive</span>
+<span class="kn">import</span> <span class="nn">asyncio</span>
+
+<span class="n">async</span> <span class="k">def</span> <span class="nf">get_access_token</span><span class="p">(</span><span class="n">client</span><span class="p">):</span>
+    <span class="n">code</span> <span class="o">=</span> <span class="n">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get_code</span><span class="p">()</span>
+    <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Go to mixer.com/go and enter {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">code</span><span class="p">))</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="n">code</span><span class="o">.</span><span class="n">accepted</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">interactive</span><span class="o">.</span><span class="n">ShortCodeAccessDeniedError</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;The user denied access to our client&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">interactive</span><span class="o">.</span><span class="n">ShortCodeTimeoutError</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Yo, you&#39;re too slow! Let&#39;s try again...&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="n">get_access_token</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+
+<span class="n">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">interactive</span><span class="o">.</span><span class="n">OAuthClient</span><span class="p">(</span><span class="n">my_client_id</span><span class="p">)</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+        <span class="n">token</span> <span class="o">=</span> <span class="n">await</span> <span class="n">get_access_token</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Access token: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">token</span><span class="o">.</span><span class="n">access</span><span class="p">))</span>
+
+<span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">run</span><span class="p">())</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>client_id</strong> (<em>string</em>) – Your OAuth client ID</li>
+<li><strong>client_secret</strong> (<em>string</em>) – Your OAuth client secret, if any</li>
+<li><strong>host</strong> (<em>string</em>) – Base address of the Mixer servers</li>
+<li><strong>scopes</strong> (<em>list</em><em>[</em><em>string</em><em>]</em>) – A list of scopes to request. For Interactive, you only
+need the ‘interactive:robot:self’ scope</li>
+<li><strong>loop</strong> (<em>asyncio.Loop</em>) – asyncio event loop to attach to</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="interactive_python.OAuthClient.get_code">
+<em class="property">coroutine </em><code class="descname">get_code</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/oauth.html#OAuthClient.get_code"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.OAuthClient.get_code" title="Permalink to this definition">¶</a></dt>
+<dd><p>Requests a shortcode from the Mixer servers and returns an
+OAuthShortCode handle.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference internal" href="#interactive_python.OAuthShortCode" title="interactive_python.OAuthShortCode">OAuthShortCode</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.OAuthShortCode">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">OAuthShortCode</code><span class="sig-paren">(</span><em>grant</em>, <em>client</em>, <em>body</em>, <em>check_interval=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/oauth.html#OAuthShortCode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.OAuthShortCode" title="Permalink to this definition">¶</a></dt>
+<dd><p>OAuthShortCode is the shortcode handle returned by the <cite>OAuthClient</cite>. See
+documentation on that class for more information and usage examples.</p>
+<dl class="attribute">
+<dt id="OAuthShortCode.code">
+<code class="descname">code</code><a class="headerlink" href="#OAuthShortCode.code" title="Permalink to this definition">¶</a></dt>
+<dd><p>The short six-digit code to be displayed to the user. They should be prompted to enter it on <a class="reference external" href="https://mixer.com/go">mixer.com/go</a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.OAuthShortCode.accepted">
+<em class="property">coroutine </em><code class="descname">accepted</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/oauth.html#OAuthShortCode.accepted"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.OAuthShortCode.accepted" title="Permalink to this definition">¶</a></dt>
+<dd><p>Waits until the user enters the shortcode on the Mixer website. Throws
+if they deny access or don’t enter the code in time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><ul class="first simple">
+<li><a class="reference internal" href="#interactive_python.ShortCodeAccessDeniedError" title="interactive_python.ShortCodeAccessDeniedError"><strong>ShortCodeAccessDeniedError</strong></a> – if the user denies access</li>
+<li><a class="reference internal" href="#interactive_python.ShortCodeTimeoutError" title="interactive_python.ShortCodeTimeoutError"><strong>ShortCodeTimeoutError</strong></a> – if the user doesn’t enter</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="#interactive_python.OAuthTokens" title="interactive_python.OAuthTokens">OAuthTokens</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.OAuthTokens">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">OAuthTokens</code><span class="sig-paren">(</span><em>body</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/oauth.html#OAuthTokens"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.OAuthTokens" title="Permalink to this definition">¶</a></dt>
+<dd><p>OAuthTokens is a bearer from an OAuth access and refresh token retrieved
+via the <a class="reference internal" href="#interactive_python.OAuthShortCode.accepted" title="interactive_python.OAuthShortCode.accepted"><code class="xref py py-func docutils literal"><span class="pre">accepted()</span></code></a> method.</p>
+<dl class="attribute">
+<dt id="OAuthTokens.access">
+<code class="descname">access</code><a class="headerlink" href="#OAuthTokens.access" title="Permalink to this definition">¶</a></dt>
+<dd><p>The OAuth access token to use in <a class="reference internal" href="#interactive_python.State.connect" title="interactive_python.State.connect"><code class="xref py py-func docutils literal"><span class="pre">connect()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="OAuthTokens.refresh">
+<code class="descname">refresh</code><a class="headerlink" href="#OAuthTokens.refresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>The OAuth refresh token that can be used to re-grant the access token.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="OAuthTokens.expires_at">
+<code class="descname">expires_at</code><a class="headerlink" href="#OAuthTokens.expires_at" title="Permalink to this definition">¶</a></dt>
+<dd><p>The datetime at which the access token expires.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="state">
+<h2>State<a class="headerlink" href="#state" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="interactive_python.State">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">State</code><span class="sig-paren">(</span><em>connection</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/state.html#State"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.State" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">pyee.EventEmitter</span></code></p>
+<p>State is the state container for a single interactive session.
+It should usually be created via the static
+<a class="reference internal" href="#interactive_python.State.connect" title="interactive_python.State.connect"><code class="xref py py-func docutils literal"><span class="pre">connect()</span></code></a> method:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">connection</span> <span class="o">=</span> <span class="n">State</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+    <span class="n">project_version_id</span><span class="o">=</span><span class="n">my_version_id</span><span class="p">,</span>
+    <span class="n">authorization</span><span class="o">=</span><span class="s2">&quot;Bearer &quot;</span> <span class="o">+</span> <span class="n">oauth_token</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The Scene is a pyee.EventEmitter. When calls come down, they’re always
+emitted on the State by their method name. So, for instance, you can
+listen to “onSceneCreate” or “onParticipantJoin” on the scene:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">greet</span><span class="p">(</span><span class="n">call</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">participant</span> <span class="ow">in</span> <span class="n">call</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;participants&#39;</span><span class="p">]:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Welcome {}!&#39;</span><span class="p">,</span> <span class="n">participant</span><span class="p">[</span><span class="s1">&#39;username&#39;</span><span class="p">])</span>
+
+<span class="n">scene</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;onParticipantJoin&#39;</span><span class="p">,</span> <span class="n">greet</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The state can work in two modes for handling delivery of events and updates.
+You can use <cite>pump()</cite> calls synchronously within your game loop to apply
+updates that have been queued. Alternately, you can call <code class="docutils literal"><span class="pre">pump_async()</span></code> to
+signal to that state that you want updates delivered asynchronously, as soon
+as they come in. For example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="c1"># Async delivery. `giveInput` is emitted as soon as any input comes in.</span>
+<span class="n">state</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;giveInput&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">call</span><span class="p">:</span> <span class="n">do_the_thing</span><span class="p">(</span><span class="n">call</span><span class="p">))</span>
+<span class="n">state</span><span class="o">.</span><span class="n">pump_async</span><span class="p">()</span>
+
+<span class="c1"># Sync delivery. `giveInput` is emitted only during calls to pump()</span>
+<span class="n">state</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;giveInput&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">call</span><span class="p">:</span> <span class="n">do_the_thing</span><span class="p">(</span><span class="n">call</span><span class="p">))</span>
+<span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+    <span class="n">my_game_loop</span><span class="o">.</span><span class="n">tick</span><span class="p">()</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">pump</span><span class="p">()</span>
+
+    <span class="c1"># You can also read queues of changes from pump(), if you prefer</span>
+    <span class="c1"># to dispatch changes manually:</span>
+    <span class="c1"># for call in pump(): ...</span>
+</pre></div>
+</div>
+<p>In both modes, all incoming call are emitted as events on the State
+instance.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>connection</strong> (<a class="reference internal" href="#interactive_python.Connection" title="interactive_python.Connection"><em>Connection</em></a>) – The websocket connection to interactive.</td>
+</tr>
+</tbody>
+</table>
+<dl class="attribute">
+<dt id="State.connection">
+<code class="descname">connection</code><a class="headerlink" href="#State.connection" title="Permalink to this definition">¶</a></dt>
+<dd><p>The underlying <a class="reference internal" href="#interactive_python.Connection" title="interactive_python.Connection"><code class="xref py py-class docutils literal"><span class="pre">Connection</span></code></a> to the Interactive service. You should not need to deal with this most of the time.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.State.connect">
+<em class="property">coroutine </em><code class="descname">connect</code><span class="sig-paren">(</span><em>discovery=&lt;interactive_python.discovery.Discovery object&gt;</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/state.html#State.connect"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.State.connect" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a new interactive connection. Most arguments will be passed
+through into the Connection constructor.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>discovery</strong> (<a class="reference internal" href="#interactive_python.Discovery" title="interactive_python.Discovery"><em>Discovery</em></a>) – </li>
+<li><strong>kwargs</strong> – </li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="#interactive_python.State" title="interactive_python.State">State</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.State.create_scenes">
+<em class="property">coroutine </em><code class="descname">create_scenes</code><span class="sig-paren">(</span><em>*scenes</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/state.html#State.create_scenes"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.State.create_scenes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Can be called with one or more Scenes to add them to Interactive.
+:param scenes: list of scenes to create
+:type scenes: Scene</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.State.pump">
+<code class="descname">pump</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/state.html#State.pump"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.State.pump" title="Permalink to this definition">¶</a></dt>
+<dd><p>pump causes the state to read any updates it has queued up. This
+should usually be called at the start of any game loop where you’re
+going to be doing processing of Interactive events.</p>
+<p>Any events that have not been read when pump() is called are discarded.</p>
+<p>Alternately, you can call pump_async() to have delivery handled for you
+without manual input.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">Iterator of Calls</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.State.pump_async">
+<code class="descname">pump_async</code><span class="sig-paren">(</span><em>loop=&lt;_UnixSelectorEventLoop running=False closed=False debug=False&gt;</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/state.html#State.pump_async"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.State.pump_async" title="Permalink to this definition">¶</a></dt>
+<dd><p>Starts a pump() process working in the background. Events will be
+dispatched asynchronously.</p>
+<p>Returns a future that can be used for cancelling the pump, if desired.
+Otherwise the pump will automatically stop once
+the connection is closed.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">asyncio.Future</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.State.scene">
+<code class="descname">scene</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/state.html#State.scene"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.State.scene" title="Permalink to this definition">¶</a></dt>
+<dd><p>Looks up an existing scene by ID. It returns None if the scene does
+not exist.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – The name of the scene to look up</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"></td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference internal" href="#interactive_python.Scene" title="interactive_python.Scene">Scene</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.State.set_ready">
+<em class="property">coroutine </em><code class="descname">set_ready</code><span class="sig-paren">(</span><em>is_ready=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/state.html#State.set_ready"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.State.set_ready" title="Permalink to this definition">¶</a></dt>
+<dd><p>Marks the interactive integration as being ready-to-go. Must be called
+before controls will appear.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>is_ready</strong> – True or False to allow input</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">Reply</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.Discovery">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">Discovery</code><span class="sig-paren">(</span><em>host='https://mixer.com'</em>, <em>path='/api/v1/interactive/hosts'</em>, <em>loop=None</em>, <em>timeout=10</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/discovery.html#Discovery"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Discovery" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>Discovery is a simple service discovery class which retrieves an
+Interactive host to connect to. This is passed into the State by default;
+you usually should not need to override it.</p>
+<dl class="method">
+<dt id="interactive_python.Discovery.find">
+<em class="property">coroutine </em><code class="descname">find</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/discovery.html#Discovery.find"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Discovery.find" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the websocket address of an interactive server to connect
+to, or raises a NoServersAvailableError.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="scenes">
+<h2>Scenes<a class="headerlink" href="#scenes" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="interactive_python.Scene">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">Scene</code><span class="sig-paren">(</span><em>scene_id</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Scene"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Scene" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#interactive_python._util.Resource" title="interactive_python._util.Resource"><code class="xref py py-class docutils literal"><span class="pre">interactive_python._util.Resource</span></code></a></p>
+<p>Scene is a container for controls in interactive. Groups can be assigned
+to scenes. It emits:</p>
+<blockquote>
+<div><ul class="simple">
+<li>A <code class="docutils literal"><span class="pre">delete</span></code> event when the scene is deleted, with the
+<a class="reference internal" href="#interactive_python.Call" title="interactive_python.Call"><code class="xref py py-class docutils literal"><span class="pre">Call</span></code></a> from “onSceneDelete”.</li>
+<li>An <code class="docutils literal"><span class="pre">update</span></code> event when the scene is updated, with the
+<a class="reference internal" href="#interactive_python.Call" title="interactive_python.Call"><code class="xref py py-class docutils literal"><span class="pre">Call</span></code></a> from  “onSceneUpdate”.</li>
+</ul>
+</div></blockquote>
+<dl class="attribute">
+<dt id="Scene.controls">
+<code class="descname">controls</code><a class="headerlink" href="#Scene.controls" title="Permalink to this definition">¶</a></dt>
+<dd><p>A dict of control IDs to :class:<a href="#id2"><span class="problematic" id="id3">`</span></a>~interactive_python.Control`s in the scene.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Scene.create_controls">
+<em class="property">coroutine </em><code class="descname">create_controls</code><span class="sig-paren">(</span><em>*controls</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Scene.create_controls"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Scene.create_controls" title="Permalink to this definition">¶</a></dt>
+<dd><p>Can be called with one or more Controls to add them to to the scene.
+:param controls: list of controls to create
+:type controls: List[Control]</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Scene.delete">
+<em class="property">coroutine </em><code class="descname">delete</code><span class="sig-paren">(</span><em>reassign_scene_id='default'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Scene.delete"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Scene.delete" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deletes the scene from Interactive. Takes the id of the scene
+to reassign any groups who are on that scene to.
+:param reassign_scene_id:
+:type reassign_scene_id: str
+:rtype: None</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Scene.update">
+<em class="property">coroutine </em><code class="descname">update</code><span class="sig-paren">(</span><em>priority=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Scene.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Scene.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves all changes updates made to the scene.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.Control">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">Control</code><span class="sig-paren">(</span><em>control_id</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Control"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Control" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#interactive_python._util.Resource" title="interactive_python._util.Resource"><code class="xref py py-class docutils literal"><span class="pre">interactive_python._util.Resource</span></code></a></p>
+<p>Control is a structure on which participants in interactive provide input.
+It emits:</p>
+<blockquote>
+<div><ul class="simple">
+<li>A <code class="docutils literal"><span class="pre">delete</span></code> event when the control is deleted, with the
+<a class="reference internal" href="#interactive_python.Call" title="interactive_python.Call"><code class="xref py py-class docutils literal"><span class="pre">Call</span></code></a> from “onControlDelete”.</li>
+<li>An <code class="docutils literal"><span class="pre">update</span></code> event when the control is updated, with the
+<a class="reference internal" href="#interactive_python.Call" title="interactive_python.Call"><code class="xref py py-class docutils literal"><span class="pre">Call</span></code></a> from “onControlUpdate”.</li>
+<li>Other kinds events are fired when input is given on the control, like
+<code class="docutils literal"><span class="pre">mousedown</span></code> for buttons or <code class="docutils literal"><span class="pre">move</span></code> for joysticks. They’re fired with
+the <a class="reference internal" href="#interactive_python.Call" title="interactive_python.Call"><code class="xref py py-class docutils literal"><span class="pre">Call</span></code></a> that triggered them.</li>
+</ul>
+</div></blockquote>
+<p>Here’s an example of creating a button and listening for clicks:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">btn</span> <span class="o">=</span> <span class="n">Button</span><span class="p">(</span>
+    <span class="n">control_id</span><span class="o">=</span><span class="s1">&#39;click_me&#39;</span><span class="p">,</span>
+    <span class="n">text</span><span class="o">=</span><span class="s1">&#39;Click Me!&#39;</span><span class="p">,</span>
+    <span class="n">keycode</span><span class="o">=</span><span class="n">keycode</span><span class="o">.</span><span class="n">space</span><span class="p">,</span>
+    <span class="n">position</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">{</span><span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="s1">&#39;large&#39;</span><span class="p">,</span> <span class="s1">&#39;width&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;height&#39;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+
+<span class="c1"># Logs the call to the console whenever the button is clicked</span>
+<span class="n">btn</span><span class="o">.</span><span class="n">on</span><span class="p">(</span><span class="s1">&#39;mousedown&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">call</span><span class="p">:</span> <span class="k">print</span><span class="p">(</span><span class="n">call</span><span class="p">))</span>
+
+<span class="n">await</span> <span class="n">state</span><span class="o">.</span><span class="n">scene</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">create_controls</span><span class="p">(</span><span class="n">btn</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="interactive_python.Control.delete">
+<em class="property">coroutine </em><code class="descname">delete</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Control.delete"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Control.delete" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deletes the control
+:return: None</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Control.update">
+<em class="property">coroutine </em><code class="descname">update</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Control.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Control.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves all changes updates made to the control.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.Button">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">Button</code><span class="sig-paren">(</span><em>control_id</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Button"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Button" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">interactive_python.scene.Control</span></code></p>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.Joystick">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">Joystick</code><span class="sig-paren">(</span><em>control_id</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/scene.html#Joystick"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Joystick" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">interactive_python.scene.Control</span></code></p>
+</dd></dl>
+
+</div>
+<div class="section" id="utilities">
+<h2>Utilities<a class="headerlink" href="#utilities" title="Permalink to this headline">¶</a></h2>
+<dl class="data">
+<dt id="interactive_python.keycode">
+<code class="descclassname">interactive_python.</code><code class="descname">keycode</code><a class="headerlink" href="#interactive_python.keycode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Keycode is an instance of a class that helps translate keycodes from their textual representation to their corresponding numeric code, as represented on the protocol. For example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">interactive_python</span> <span class="kn">import</span> <span class="n">keycode</span>
+
+<span class="k">print</span><span class="p">(</span><span class="n">keycode</span><span class="o">.</span><span class="n">up</span><span class="p">)</span>     <span class="c1"># =&gt; 38</span>
+<span class="k">print</span><span class="p">(</span><span class="n">keycode</span><span class="o">.</span><span class="n">a</span><span class="p">)</span>      <span class="c1"># =&gt; 65</span>
+<span class="nb">getattr</span><span class="p">(</span><span class="n">keycode</span><span class="p">,</span> <span class="s1">&#39;⌘&#39;</span><span class="p">)</span> <span class="c1"># =&gt; 91</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python._util.ChangeTracker">
+<em class="property">class </em><code class="descclassname">interactive_python._util.</code><code class="descname">ChangeTracker</code><span class="sig-paren">(</span><em>data={}</em>, <em>intrinsic_properties=[]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/_util.html#ChangeTracker"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python._util.ChangeTracker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>ChangeTracker is a simple structure that keeps track of changes made to
+properties of the object.</p>
+<dl class="method">
+<dt id="interactive_python._util.ChangeTracker.assign">
+<code class="descname">assign</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/_util.html#ChangeTracker.assign"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python._util.ChangeTracker.assign" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assigns data in-bulk to the resource, returns the resource.
+:rtype: Resource</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python._util.ChangeTracker.has_changed">
+<code class="descname">has_changed</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/_util.html#ChangeTracker.has_changed"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python._util.ChangeTracker.has_changed" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns whether any metadata properties have changed.
+:rtype: bool</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python._util.ChangeTracker.to_json">
+<code class="descname">to_json</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/_util.html#ChangeTracker.to_json"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python._util.ChangeTracker.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>to_json will be called when serializing the resource to JSON. It returns
+the raw data.
+:return:</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python._util.Resource">
+<em class="property">class </em><code class="descclassname">interactive_python._util.</code><code class="descname">Resource</code><span class="sig-paren">(</span><em>id</em>, <em>id_property</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/_util.html#Resource"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python._util.Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">pyee.EventEmitter</span></code>, <a class="reference internal" href="#interactive_python._util.ChangeTracker" title="interactive_python._util.ChangeTracker"><code class="xref py py-class docutils literal"><span class="pre">interactive_python._util.ChangeTracker</span></code></a></p>
+<p>Resource represents some taggable, metadata-attachable construct in
+Interactive. Scenes, groups, and participants are resources.</p>
+<dl class="attribute">
+<dt id="interactive_python._util.Resource.id">
+<code class="descname">id</code><a class="headerlink" href="#interactive_python._util.Resource.id" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="errors">
+<h2>Errors<a class="headerlink" href="#errors" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="interactive_python.DiscoveryError">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">DiscoveryError</code><a class="reference internal" href="_modules/interactive_python/errors.html#DiscoveryError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.DiscoveryError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">Exception</span></code></p>
+<p>Raised if some error occurs during service discovery
+that we didn’t anticipate.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.NoServersAvailableError">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">NoServersAvailableError</code><a class="reference internal" href="_modules/interactive_python/errors.html#NoServersAvailableError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.NoServersAvailableError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">Exception</span></code></p>
+<p>Raised if Beam reports that no servers are available.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.ShortCodeError">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">ShortCodeError</code><a class="reference internal" href="_modules/interactive_python/errors.html#ShortCodeError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.ShortCodeError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">Exception</span></code></p>
+<p>Base exception raised when some unexpected event occurs in the shortcode
+OAuth flow.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.UnknownShortCodeError">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">UnknownShortCodeError</code><a class="reference internal" href="_modules/interactive_python/errors.html#UnknownShortCodeError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.UnknownShortCodeError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">interactive_python.errors.ShortCodeError</span></code></p>
+<p>Exception raised when an unknown error happens while running shortcode
+OAuth.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.ShortCodeAccessDeniedError">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">ShortCodeAccessDeniedError</code><a class="reference internal" href="_modules/interactive_python/errors.html#ShortCodeAccessDeniedError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.ShortCodeAccessDeniedError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">interactive_python.errors.ShortCodeError</span></code></p>
+<p>Exception raised when the user denies access to the client in shortcode
+OAuth.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.ShortCodeTimeoutError">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">ShortCodeTimeoutError</code><a class="reference internal" href="_modules/interactive_python/errors.html#ShortCodeTimeoutError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.ShortCodeTimeoutError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">interactive_python.errors.ShortCodeError</span></code></p>
+<p>Exception raised when the shortcode expires without being accepted.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="low-level-protocol">
+<h2>Low-Level Protocol<a class="headerlink" href="#low-level-protocol" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="interactive_python.Connection">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">Connection</code><span class="sig-paren">(</span><em>address=None</em>, <em>authorization=None</em>, <em>project_version_id=None</em>, <em>project_sharecode=None</em>, <em>extra_headers={}</em>, <em>loop=&lt;_UnixSelectorEventLoop running=False closed=False debug=False&gt;</em>, <em>socket=None</em>, <em>protocol_version='2.0'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>The Connection is used to connect to the Interactive server. It connects
+to a provided socket address and provides an interface for making RPC
+calls. Example usage:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">connection</span> <span class="o">=</span> <span class="n">Connection</span><span class="p">(</span>
+    <span class="n">address</span><span class="o">=</span><span class="n">get_interactive_address</span><span class="p">(),</span>
+    <span class="n">authorization</span><span class="o">=</span><span class="s2">&quot;Bearer {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">my_oauth_token</span><span class="p">),</span>
+    <span class="n">interactive_version_id</span><span class="o">=</span><span class="mi">1234</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="interactive_python.Connection.call">
+<em class="property">coroutine </em><code class="descname">call</code><span class="sig-paren">(</span><em>method</em>, <em>params</em>, <em>discard=False</em>, <em>timeout=10</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection.call"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection.call" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends a method call to the interactive socket. If discard
+is false, we’ll wait for a response before returning, up to the
+timeout duration in seconds, at which point it raises an
+asyncio.TimeoutError. If the timeout is None, we’ll wait forever.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>method</strong> (<em>str</em>) – Method name to call</li>
+<li><strong>params</strong> – Parameters to insert into the method, generally a dict.</li>
+<li><strong>discard</strong> (<em>bool</em>) – <code class="docutils literal"><span class="pre">True</span></code> to not request any reply to the method.</li>
+<li><strong>timeout</strong> (<em>int</em>) – Call timeout duration, in seconds.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">The call response, or None if it was discarded.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last">asyncio.TimeoutError</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Connection.close">
+<em class="property">coroutine </em><code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection.close"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection.close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Closes the socket connection gracefully</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Connection.connect">
+<em class="property">coroutine </em><code class="descname">connect</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection.connect"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection.connect" title="Permalink to this definition">¶</a></dt>
+<dd><p>Connects to the Interactive server, waiting until the connection
+if fully established before returning. Can throw a ClosedError
+if something, such as authentication, fails.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Connection.get_packet">
+<code class="descname">get_packet</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection.get_packet"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection.get_packet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Synchronously reads a packet from the connection. Returns None if
+there are no more packets in the queue. Example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">while</span> <span class="n">await</span> <span class="n">connection</span><span class="o">.</span><span class="n">has_packet</span><span class="p">():</span>
+    <span class="n">dispatch_call</span><span class="p">(</span><span class="n">connection</span><span class="o">.</span><span class="n">get_packet</span><span class="p">())</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference internal" href="#interactive_python.Call" title="interactive_python.Call">Call</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Connection.has_packet">
+<em class="property">coroutine </em><code class="descname">has_packet</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection.has_packet"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection.has_packet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Blocks until a packet is read. Returns true if a packet is then
+available, or false if the connection is subsequently closed. Example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">while</span> <span class="n">await</span> <span class="n">connection</span><span class="o">.</span><span class="n">has_packet</span><span class="p">():</span>
+    <span class="n">dispatch_call</span><span class="p">(</span><span class="n">connection</span><span class="o">.</span><span class="n">get_packet</span><span class="p">())</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">bool</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Connection.reply">
+<code class="descname">reply</code><span class="sig-paren">(</span><em>call_id</em>, <em>result=None</em>, <em>error=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection.reply"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection.reply" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends a reply for a packet id. Either the result or error should
+be fulfilled.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>call_id</strong> (<em>int</em>) – The ID of the call being replied to.</li>
+<li><strong>result</strong> – The successful result of the call.</li>
+<li><strong>error</strong> – The errorful result of the call.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Connection.set_compression">
+<em class="property">coroutine </em><code class="descname">set_compression</code><span class="sig-paren">(</span><em>scheme</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Connection.set_compression"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Connection.set_compression" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the compression used on the websocket this should be
+called with an instance of the Encoding class, for example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">connection</span><span class="o">.</span><span class="n">set_compression</span><span class="p">(</span><span class="n">GzipEncoding</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>You can, optionally, await on the resolution of method, though
+doing so it not at all required. Returns True if the server agreed
+on and executed the switch.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>scheme</strong> (<a class="reference internal" href="#interactive_python.encoding.Encoding" title="interactive_python.encoding.Encoding"><em>Encoding</em></a>) – The compression scheme to use</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">Whether the upgrade was successful</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">bool</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.Call">
+<em class="property">class </em><code class="descclassname">interactive_python.</code><code class="descname">Call</code><span class="sig-paren">(</span><em>connection</em>, <em>payload</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Call"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Call" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<dl class="attribute">
+<dt id="interactive_python.Call.data">
+<code class="descname">data</code><a class="headerlink" href="#interactive_python.Call.data" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The payload of the method being called.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">dict</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="interactive_python.Call.name">
+<code class="descname">name</code><a class="headerlink" href="#interactive_python.Call.name" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The name of the method being called.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.Call.reply_error">
+<code class="descname">reply_error</code><span class="sig-paren">(</span><em>error</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/connection.html#Call.reply_error"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.Call.reply_error" title="Permalink to this definition">¶</a></dt>
+<dd><p>Submits an errorful reply for the call.
+:param error: The error to send to tetrisd</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-interactive_python.encoding"></span><dl class="class">
+<dt id="interactive_python.encoding.Encoding">
+<em class="property">class </em><code class="descclassname">interactive_python.encoding.</code><code class="descname">Encoding</code><a class="reference internal" href="_modules/interactive_python/encoding.html#Encoding"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.Encoding" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+<p>Encoding is an abstract class that defines methods for decoding incoming
+and encoding outgoing websocket calls. Both encode() and decode() are
+allowed to raise EncodingExceptions, which will trigger a fallback to
+plain-text encoding.</p>
+<dl class="method">
+<dt id="interactive_python.encoding.Encoding.decode">
+<code class="descname">decode</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#Encoding.decode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.Encoding.decode" title="Permalink to this definition">¶</a></dt>
+<dd><p>decode takes a byte slice of data and
+returns it decoded, string form</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.encoding.Encoding.encode">
+<code class="descname">encode</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#Encoding.encode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.Encoding.encode" title="Permalink to this definition">¶</a></dt>
+<dd><p>encode takes a string of data and returns its encoded form</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.encoding.Encoding.name">
+<code class="descname">name</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#Encoding.name"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.Encoding.name" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="interactive_python.encoding.EncodingException">
+<em class="property">exception </em><code class="descclassname">interactive_python.encoding.</code><code class="descname">EncodingException</code><a class="reference internal" href="_modules/interactive_python/encoding.html#EncodingException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.EncodingException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">Exception</span></code></p>
+<p>An EncodingException is raised if an error occurs in an encoding or
+decoding algorithm. Raising this exception triggers a fallback to
+plain text encoding.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.encoding.GzipEncoding">
+<em class="property">class </em><code class="descclassname">interactive_python.encoding.</code><code class="descname">GzipEncoding</code><span class="sig-paren">(</span><em>compression_level=6</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#GzipEncoding"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.GzipEncoding" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#interactive_python.encoding.Encoding" title="interactive_python.encoding.Encoding"><code class="xref py py-class docutils literal"><span class="pre">interactive_python.encoding.Encoding</span></code></a></p>
+<dl class="method">
+<dt id="interactive_python.encoding.GzipEncoding.decode">
+<code class="descname">decode</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#GzipEncoding.decode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.GzipEncoding.decode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.encoding.GzipEncoding.encode">
+<code class="descname">encode</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#GzipEncoding.encode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.GzipEncoding.encode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.encoding.GzipEncoding.name">
+<code class="descname">name</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#GzipEncoding.name"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.GzipEncoding.name" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="interactive_python.encoding.TextEncoding">
+<em class="property">class </em><code class="descclassname">interactive_python.encoding.</code><code class="descname">TextEncoding</code><a class="reference internal" href="_modules/interactive_python/encoding.html#TextEncoding"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.TextEncoding" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#interactive_python.encoding.Encoding" title="interactive_python.encoding.Encoding"><code class="xref py py-class docutils literal"><span class="pre">interactive_python.encoding.Encoding</span></code></a></p>
+<dl class="method">
+<dt id="interactive_python.encoding.TextEncoding.decode">
+<code class="descname">decode</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#TextEncoding.decode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.TextEncoding.decode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.encoding.TextEncoding.encode">
+<code class="descname">encode</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#TextEncoding.encode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.TextEncoding.encode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="interactive_python.encoding.TextEncoding.name">
+<code class="descname">name</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#TextEncoding.name"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.TextEncoding.name" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="interactive_python.encoding.reset_buffer">
+<code class="descclassname">interactive_python.encoding.</code><code class="descname">reset_buffer</code><span class="sig-paren">(</span><em>buffer</em>, <em>value=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/interactive_python/encoding.html#reset_buffer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#interactive_python.encoding.reset_buffer" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">API</a><ul>
+<li><a class="reference internal" href="#oauth">OAuth</a></li>
+<li><a class="reference internal" href="#state">State</a></li>
+<li><a class="reference internal" href="#scenes">Scenes</a></li>
+<li><a class="reference internal" href="#utilities">Utilities</a></li>
+<li><a class="reference internal" href="#errors">Errors</a></li>
+<li><a class="reference internal" href="#low-level-protocol">Low-Level Protocol</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Mixer Interactive Python API</a></li>
+      <li>Next: <a href="examples.html" title="next chapter">Runnable Examples</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/api.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;Microsoft.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
