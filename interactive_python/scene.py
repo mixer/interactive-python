@@ -45,13 +45,18 @@ class Scene(Resource):
         )
 
     def attach_controls(self, *controls):
+        """
+        Can be called with one or more Controls to add them to to the scene.
+        :param controls: list of controls to create
+        :type controls: List[Control]
+        """
         for control in controls:
             self.controls[control.id] = control
             control._attach_scene(self)
 
     async def create_controls(self, *controls):
         """
-        Can be called with one or more Controls to add them to to the scene.
+        Define and create one or more controls, and add them to the scene.
         :param controls: list of controls to create
         :type controls: List[Control]
         """
@@ -117,6 +122,17 @@ class Control(Resource):
         btn.on('mousedown', lambda call: print(call))
 
         await state.scene('default').create_controls(btn)
+
+    When using controls defined in the interactive studio editor, you only need to
+    define the control_id, and the events then attach them to the scene.
+
+        js = Joystick(control_id='joystick_1')
+        btn = Button(control_id='click_me')
+
+        js.on('move', lambda call: print(call.data['input'].x, call.data['input'].y))
+        btn.on('mousedown', lambda call: print(call))
+
+        state.scene('default').attach_controls(js, btn)
 
     """
 
