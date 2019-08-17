@@ -44,16 +44,18 @@ class Scene(Resource):
             {'scenes': [self._capture_changes()], 'priority': priority}
         )
 
+    def attach_controls(self, *controls):
+        for control in controls:
+            self.controls[control.id] = control
+            control._attach_scene(self)
+
     async def create_controls(self, *controls):
         """
         Can be called with one or more Controls to add them to to the scene.
         :param controls: list of controls to create
         :type controls: List[Control]
         """
-        for control in controls:
-            self.controls[control.id] = control
-            control._attach_scene(self)
-
+        self.attach_controls(controls)
         return await self._connection.call('createControls', {
             'sceneID': self.id,
             'controls': controls,
