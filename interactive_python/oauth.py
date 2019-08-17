@@ -75,14 +75,20 @@ class OAuthShortCode:
         address = self._grant.url('/oauth/token')
         payload = {
             'client_id': self._grant.client_id,
+            'client_secret': self._grant.client_secret,
             'grant_type': 'authorization_code',
             'code': body['code'],
+            'redirect_uri': ''
+        }
+        headers = {
+            'content-type': 'application/json',
+            'client-id': self._grant.client_id
         }
 
-        async with self._client.post(address, json=payload) as res:
+        async with self._client.post(address, json=payload, headers=headers) as res:
             if res.status != 200:
-                raise UnknownShortCodeError('Expected a 2xx status code, but'
-                                            'got {}'.format(res.status))
+                raise UnknownShortCodeError('Expected a 2xx status code, but '
+                                            'got {0} : reason {1}'.format(res.status, await res.text()))
 
             return OAuthTokens(await res.json())
 
@@ -162,7 +168,7 @@ class OAuthClient:
 
         async with self._client.post(address, json=payload) as res:
             if res.status >= 300:
-                raise UnknownShortCodeError('Expected a 2xx status code, but'
-                                            'got {}'.format(res.status))
+                raise UnknownShortCodeError('Expected a 2xx status code, but '
+                                            'got {0} : reason {1}'.format(res.status, await res.text()))
 
             return OAuthShortCode(self._grant, self._client, await res.json())
